@@ -198,7 +198,7 @@ def test_misc_setters(tmp_path):
     assert on_disk["dns"]["block_mode"] == "nxdomain" and on_disk["dns"]["block_ttl"] == 60
     assert on_disk["filters"]["update_interval_hours"] == 12 and on_disk["filters"]["unmetered_only"]
     assert on_disk["logging"] == {"enabled": False, "retention_days": 30}
-    assert on_disk["trusted_networks"] == [{"uuid": "0123abcd-0000", "name": "Home", "mode": "pause"}]
+    assert on_disk["trusted_networks"] == [{"uuid": "0123abcd-0000", "name": "Home", "mode": "pause", "bssid": ""}]
     for name, args in (("SetBlockedResponse", ("bogus", 10)), ("SetBlockedResponse", ("null_ip", 10**6)),
                        ("SetFilterSchedule", (5, False)), ("SetLogging", (True, 0)),
                        ("SetTrustedNetworks", ('{"networks": [{"uuid": "!"}]}',))):

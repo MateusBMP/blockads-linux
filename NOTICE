@@ -47,7 +47,9 @@ notices; the modifications are Copyright (C) 2026 MateusBMP. Derived parts:
     internal/safesearch/safesearch_test.go and internal/dns/stamp_test.go.
 
 Upstream revision used for the port and parity tests:
-  fc95d66a9443da14729e280c61b496a2bcdda86c
+  5d1184d1635ac5f21c2928093b4c926db0ca6551
+(the parser follows this revision; the other derived parts were ported at
+fc95d66a9443da14729e280c61b496a2bcdda86c and are unchanged upstream since.)
 
 Filter lists
 ------------

@@ -1,7 +1,7 @@
 """Tests for filters.parser.
 
 The first table is copied verbatim from upstream
-tunnel/internal/trie/compiler_test.go (TestParseDomainLine, rev fc95d66a):
+tunnel/internal/trie/compiler_test.go (TestParseDomainLine, rev 5d1184d1):
 parity with blockads-android is the contract.
 """
 
@@ -78,6 +78,13 @@ UPSTREAM_CASES = [
     # TLD wildcard rules (e.g. from spam-tlds.txt)
     ("||*.actor^", "actor"),
     ("||*.africa^$denyallow=nation.africa", "africa"),
+    # Browser-only / risky modifiers must not become full-domain DNS blocks
+    ("||example.com^$popup", ""),
+    ("||example.com^$document", ""),
+    ("||example.com^$doc", ""),
+    ("||example.com^$empty", ""),
+    ("||example.com^$mp4", ""),
+    ("||cdn.example.com^$denyallow=app.example.com", ""),
     # Comments and cosmetic rules
     ("", ""),
     ("# comment", ""),
@@ -109,6 +116,10 @@ def test_parse_domain_line_matches_upstream(line, want):
         ("||a.example^$dnsrewrite=1.2.3.4", ""),
         ("||a.example^$removeparam=/x/", ""),  # '/' rejected before options are read
         ("||a.example^$,", "a.example"),  # empty options are allowed
+        ("||a.example^$POPUP", ""),  # options are lowercased before the check
+        ("||a.example^$DNSTYPE=AAAA", "a.example"),
+        ("||africa^$DenyAllow=nation.africa", "africa"),  # single label without "*."
+        ("||africa^$denyallow", ""),  # only "denyallow=" with a value
         # IP literal handling.
         ("010.1.1.1", "010.1.1.1"),  # leading zeros: not an IP for Go >= 1.17
         ("1.2.3", "1.2.3"),
@@ -139,6 +150,7 @@ def test_go_helpers():
     [
         ("||ads.example^", ListRule(RuleKind.BLOCK, "ads.example")),
         ("||ads.example^$important", ListRule(RuleKind.BLOCK, "ads.example", important=True)),
+        ("||ads.example^$IMPORTANT", ListRule(RuleKind.BLOCK, "ads.example", important=True)),
         ("@@||allowed.example^", ListRule(RuleKind.EXCEPTION, "allowed.example")),
         ("@@allowed.example", ListRule(RuleKind.EXCEPTION, "allowed.example")),
         ("@@||allowed.example^$important", ListRule(RuleKind.EXCEPTION, "allowed.example")),

@@ -121,3 +121,18 @@ def test_rules_storage(tmp_path):
     path = tmp_path / "rules.json"
     save(path, Rules(("||x.example^",)))
     assert load_rules(path).value == Rules(("||x.example^",))
+
+
+def test_trusted_network_bssid():
+    from blockads_linux.common.settings import Settings
+    doc = Settings().to_dict()
+    doc["trusted_networks"] = [{"uuid": "0123abcd-0000", "name": "Home", "mode": "pause", "bssid": "AA:bb:CC:dd:EE:01"},
+                               {"uuid": "0123abcd-0001", "name": "Cafe", "mode": "pause", "bssid": "nope"}]
+    settings, problems = Settings.from_dict(doc)
+    home, cafe = settings.trusted_networks
+    assert home.matches("0123abcd-0000", "aa:bb:cc:dd:ee:01") and not home.matches("0123abcd-0000", "aa:bb:cc:dd:ee:02")
+    assert not home.matches("0123abcd-0000", "") and not home.matches("", "aa:bb:cc:dd:ee:01")
+    assert cafe.bssid == "" and any("bssid" in p for p in problems)  # a bad pin is dropped, not the network
+    assert cafe.matches("0123abcd-0001", "anything")
+    with pytest.raises(SettingsError):
+        Settings.from_dict(doc, strict=True)

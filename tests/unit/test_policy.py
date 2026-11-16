@@ -213,3 +213,19 @@ def test_trusted_network_without_dns_servers():
     empty = NetworkState("networkmanager", connectivity=Connectivity.FULL, primary_uuid=HOME)
     p = policy(empty, network_dns_uuids={HOME})
     assert not p.trusted_dns and p.tiers[0].name == "configured"
+
+
+def test_network_dns_pinned_to_an_access_point():
+    config = PolicyConfig(configured=PLAIN, network_dns_uuids={"home", "office"},
+                          network_dns_pins={("home", "AA:BB:CC:DD:EE:01")})
+    assert config.trusts_network_dns("home", "aa:bb:cc:dd:ee:01")
+    assert not config.trusts_network_dns("home", "aa:bb:cc:dd:ee:02")  # same name, another access point
+    assert not config.trusts_network_dns("home", "")
+    assert config.trusts_network_dns("office", "") and config.trusts_network_dns("office", "aa:bb:cc:dd:ee:09")
+    assert not config.trusts_network_dns("", "") and not config.trusts_network_dns("cafe", "aa:bb:cc:dd:ee:01")
+    lan = (LinkDns("wlan0", ("192.168.1.1",), default_route=True),)
+    policy = UpstreamPolicy(config, NetworkState("networkmanager", primary_uuid="home",
+                                                 primary_bssid="aa:bb:cc:dd:ee:01", links=lan))
+    assert policy.trusted_dns
+    policy.apply(NetworkState("networkmanager", primary_uuid="home", primary_bssid="aa:bb:cc:dd:ee:02", links=lan))
+    assert not policy.trusted_dns

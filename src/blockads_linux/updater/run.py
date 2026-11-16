@@ -34,7 +34,7 @@ from ..common.paths import Paths
 from ..common.settings import Settings, load_settings
 from ..filters.artifact import DEFAULT_MAX_ENTRIES, ArtifactBuilder, ArtifactError, TooManyRules
 from ..filters.catalog import Catalog, load_bundled_catalog
-from ..filters.parser import iter_binary_lines, iter_list_rules
+from ..filters.parser import PARSER_VERSION, iter_binary_lines, iter_list_rules
 from . import manifest as mf
 from .fetch import FetchError, Fetcher, FetchResult
 from .manifest import ListEntry, Manifest, Source
@@ -75,6 +75,8 @@ def is_due(target: Target, entry: ListEntry | None, interval_hours: int, now: fl
     age = now - entry.checked_at
     if entry.error and age >= RETRY_FAILED_AFTER:
         return True
+    if entry.parser != PARSER_VERSION and not entry.error:
+        return True  # compiled by another parser: recompile now (a failure waits for the retry above)
     return interval_hours > 0 and age >= interval_hours * 3600
 
 
@@ -147,6 +149,9 @@ class Updater:
     async def _update(self, target: Target, old: ListEntry | None) -> tuple[ListEntry, str]:
         now = int(self.clock())
         same_urls = old is not None and old.artifact and tuple(s.url for s in old.sources) == target.urls
+        # Compiled by another parser version: fetch in full (no ETag) and compile even if unchanged.
+        current_parser = old is not None and old.parser == PARSER_VERSION
+        same_urls = same_urls and current_parser
         previous_sources = {s.url: s for s in old.sources} if same_urls and old else {}
         files = [self.paths.download_dir / f"{target.id}.{index}" for index in range(len(target.urls))]
         try:
@@ -163,12 +168,13 @@ class Updater:
                     fetched[index] = await self.fetcher.fetch(target.urls[index], files[index])
             sources = tuple(Source(target.urls[i], r.sha256, r.size, r.etag, r.last_modified)
                             for i, r in enumerate(fetched))
-            if old is not None and old.artifact and [s.sha256 for s in old.sources] == [s.sha256 for s in sources]:
+            if (current_parser and old is not None and old.artifact
+                    and [s.sha256 for s in old.sources] == [s.sha256 for s in sources]):
                 return dataclasses.replace(old, checked_at=now, error="", sources=sources), "unchanged"
             info = await asyncio.to_thread(self._compile, files, sources, now)
             if old is not None and old.rules and info.block_count < old.rules * (1 - MAX_SHRINK):
                 raise FetchError(f"the list shrank from {old.rules} to {info.block_count} rules; kept the old one")
-            entry = ListEntry(info.name, info.block_count, now, now, now, sources, "")
+            entry = ListEntry(info.name, info.block_count, now, now, now, sources, "", PARSER_VERSION)
             return entry, "updated"
         except (FetchError, ArtifactError, OSError) as exc:
             message = _message(exc)

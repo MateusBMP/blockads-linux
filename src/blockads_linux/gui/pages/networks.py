@@ -2,7 +2,9 @@
 
 A trusted network is keyed by its NetworkManager connection UUID and has a
 mode: ``pause`` (no filtering while it is the primary connection) or
-``network_dns`` (keep filtering, but ask that network's DNS first). The
+``network_dns`` (keep filtering, but ask that network's DNS first). A Wi-Fi
+entry can be pinned to one access point (``bssid``): then a look-alike
+network with the same name is not trusted. The
 daemon acts on it (``GetStatus.protection.trusted_network``); this page edits
 the list with ``SetTrustedNetworks`` (a weakening action: the admin password).
 
@@ -16,6 +18,7 @@ from typing import Any
 
 from PyQt6.QtWidgets import (
     QAbstractItemView,
+    QCheckBox,
     QComboBox,
     QHBoxLayout,
     QHeaderView,
@@ -79,10 +82,13 @@ class NetworksPage(Page):
         row.addWidget(self.trust_button)
         row.addStretch(1)
         current.layout_.addLayout(row)
+        self.pin = QCheckBox(self.tr("Only through this access point"))
+        self.pin.setObjectName("pin_access_point")
+        current.add(self.pin)
         self.evil_twin = current.add(plain(self.tr(
             "NetworkManager recognizes a Wi-Fi network by its name. Another network with the same name "
-            "(an \"evil twin\") would be trusted too: trust only networks you control, and prefer \"Keep "
-            "filtering\" for public ones.")))
+            "(an \"evil twin\") would be trusted too, unless you trust it only through this access point. "
+            "Trust only networks you control, and prefer \"Keep filtering\" for public ones.")))
         self.evil_twin.setObjectName("evil_twin_warning")
         layout.addWidget(current)
 
@@ -164,28 +170,45 @@ class NetworksPage(Page):
             self.current_state.setText("")
             self.trust_button.setEnabled(False)
             self.mode.setEnabled(False)
+            self.pin.setVisible(False)
             self.evil_twin.setVisible(False)
             return
         kind = TYPES.get(self.network.get("type", ""))
         name = fmt.safe(self.network.get("name") or uuid, 100)
         self.current_label.setText(f"{name} ({self.tr(kind)})" if kind else name)
+        bssid = str(self.network.get("bssid", "")).lower()
         entry = next((n for n in self.networks if n["uuid"] == uuid), None)
+        pinned = str(entry.get("bssid", "")).lower() if entry else ""
         if entry is None:
             self.current_state.setText(self.tr("Not trusted: filtered with your DNS settings."))
             self.trust_button.setText(self.tr("Trust this network"))
+        elif pinned and pinned != bssid:
+            self.current_state.setText(self.tr(
+                "Trusted only through access point %1; this is another one, so it is filtered.")
+                .replace("%1", fmt.safe(pinned, 17)))
+            self.trust_button.setText(self.tr("Change mode"))
         else:
             self.current_state.setText(self.tr("Trusted: %1").replace("%1", self.tr(dict(MODES)[entry["mode"]])))
             self.trust_button.setText(self.tr("Change mode"))
+        if entry is not None:
             self.mode.setCurrentIndex(max(0, self.mode.findData(entry["mode"])))
+        wireless = self.network.get("type") == WIRELESS
+        self.pin.setVisible(wireless and bool(bssid))
+        self.pin.setToolTip(fmt.safe(bssid, 17))
+        self.pin.setChecked(bool(pinned) and pinned == bssid)
+        self.pin.setEnabled(not self.read_only)
         self.trust_button.setEnabled(not self.read_only)
         self.mode.setEnabled(not self.read_only)
-        self.evil_twin.setVisible(self.network.get("type") == WIRELESS)
+        self.evil_twin.setVisible(wireless)
 
     def _fill_table(self) -> None:
         self._filling = True
         self.table.setRowCount(len(self.networks))
         for row, network in enumerate(self.networks):
-            item = QTableWidgetItem(fmt.safe(network.get("name") or network["uuid"], 100))
+            text = fmt.safe(network.get("name") or network["uuid"], 100)
+            if network.get("bssid"):
+                text += " " + self.tr("(only via %1)").replace("%1", fmt.safe(network["bssid"], 17))
+            item = QTableWidgetItem(text)
             item.setToolTip(network["uuid"])
             self.table.setItem(row, 0, item)
             combo = QComboBox()
@@ -206,8 +229,8 @@ class NetworksPage(Page):
     # --- actions ---------------------------------------------------------------------
 
     def save(self, networks: list[dict[str, Any]], done: str) -> None:
-        document = {"networks": [{"uuid": n["uuid"], "name": n.get("name", ""), "mode": n["mode"]}
-                                 for n in networks]}
+        document = {"networks": [{"uuid": n["uuid"], "name": n.get("name", ""), "mode": n["mode"],
+                                  **({"bssid": n["bssid"]} if n.get("bssid") else {})} for n in networks]}
         self.act("SetTrustedNetworks", json.dumps(document), done=done)
 
     def trust_current(self) -> None:
@@ -215,6 +238,9 @@ class NetworksPage(Page):
         if not uuid:
             return
         entry = {"uuid": uuid, "name": str(self.network.get("name", ""))[:200], "mode": self.mode.currentData()}
+        bssid = str(self.network.get("bssid", "")).lower()
+        if not self.pin.isHidden() and self.pin.isChecked() and bssid:
+            entry["bssid"] = bssid
         networks = [n for n in self.networks if n["uuid"] != uuid] + [entry]
         self.save(networks, self.tr("Trusted networks saved."))
 

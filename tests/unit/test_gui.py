@@ -635,7 +635,8 @@ def test_networks_page(stack):
     def trusted():
         return json.loads(daemon.paths.settings.read_text()).get("trusted_networks", [])
 
-    wait_until(lambda: trusted() == [{"uuid": home, "name": "Home \u202eWi-Fi", "mode": "network_dns"}],
+    assert page.pin.isHidden()  # no access point reported
+    wait_until(lambda: trusted() == [{"uuid": home, "name": "Home \u202eWi-Fi", "mode": "network_dns", "bssid": ""}],
                what="network trusted")
     wait_until(lambda: page.table.rowCount() == 1, what="table")
     page.show_status(status)
@@ -644,6 +645,22 @@ def test_networks_page(stack):
     wait_until(lambda: trusted() and trusted()[0]["mode"] == "pause", what="mode changed")
     wait_until(lambda: page.table.cellWidget(0, 1) is not None
                and page.table.cellWidget(0, 1).currentData() == "pause", what="table refreshed")
+    # Pin it to the current access point.
+    ap = dict(status, network={**status["network"], "bssid": "aa:bb:cc:dd:ee:01"})
+    page.show_status(ap)
+    assert not page.pin.isHidden() and not page.pin.isChecked()
+    page.pin.setChecked(True)
+    page.trust_current()
+    wait_until(lambda: trusted() and trusted()[0]["bssid"] == "aa:bb:cc:dd:ee:01", what="pinned")
+    wait_until(lambda: "(only via aa:bb:cc:dd:ee:01)" in page.table.item(0, 0).text(), what="pin shown")
+    page.show_status(ap)
+    assert page.pin.isChecked() and "Pause filtering" in page.current_state.text()
+    page.show_status(dict(status, network={**status["network"], "bssid": "aa:bb:cc:dd:ee:02"}))
+    assert "this is another one" in page.current_state.text() and not page.pin.isChecked()
+    page.table.cellWidget(0, 1).setCurrentIndex(1)  # changing the mode keeps the pin
+    wait_until(lambda: trusted()[0]["mode"] == "network_dns", what="mode changed again")
+    assert trusted()[0]["bssid"] == "aa:bb:cc:dd:ee:01"
+    wait_until(lambda: page.table.cellWidget(0, 2) is not None, what="table refreshed")
     page.table.cellWidget(0, 2).click()
     wait_until(lambda: trusted() == [], what="removed")
 
@@ -907,3 +924,29 @@ def test_single_instance(qapp):
     wait_until(lambda: received, what="show request")
     assert received == [b"show\n"]
     server.close()
+
+
+def test_overlap_dialog(qapp):
+    from blockads_linux.gui.pages.filters import OverlapDialog
+
+    report = {"total_entries": 7, "unique_domains": 5, "overlapping_domains": 2, "redundant_entries": 2,
+              "redundancy_percent": 28.57, "missing": ["late"],
+              "names": {"a": "List A", "b": "List B", "late": "Late"},
+              "lists": [{"id": "a", "total": 5, "shared": 2, "unique": 3, "shared_percent": 40.0},
+                        {"id": "b", "total": 2, "shared": 2, "unique": 0, "shared_percent": 100.0}],
+              "pairs": [{"a": "a", "b": "b", "shared": 2}]}
+
+    class Client:
+        def call(self, method, *args):
+            assert method == "GetFilterOverlap"
+            return _Pending(report)
+
+    dialog = OverlapDialog(type("Ctx", (), {"client": Client()})())
+    assert dialog.summary.text() == ("2 lists hold 7 entries for 5 different domains: "
+                                     "2 entries (28.6%) are duplicates.")
+    assert dialog.lists.rowCount() == 2 and dialog.lists.item(0, 0).text() == "List B"  # most shared first
+    assert dialog.lists.item(0, 2).text() == "2 (100.0%)" and dialog.lists.item(0, 3).text() == "0"
+    assert dialog.pairs.rowCount() == 1 and dialog.pairs.item(0, 2).text() == "2"
+    assert "Every domain of List B" in dialog.note.text() and "Late" in dialog.note.text()
+    dialog.show_report({**report, "lists": report["lists"][:1], "pairs": [], "missing": []})
+    assert dialog.summary.text() == "Enable at least two lists to compare them." and dialog.note.isHidden()

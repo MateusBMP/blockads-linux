@@ -40,6 +40,7 @@ UPDATE_INTERVALS = (0, 6, 12, 24, 48)  # hours; 0 = manual only
 _SPEC_RE = re.compile(r"[A-Za-z0-9:/._\-\[\]#%@+=?&~]{1,2048}")
 _ID_RE = re.compile(r"[a-z0-9_]{1,80}")
 _UUID_RE = re.compile(r"[0-9a-fA-F-]{8,64}")
+_BSSID_RE = re.compile(r"[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}")
 
 
 class SettingsError(ValueError):
@@ -68,6 +69,11 @@ def _https_url(value: str) -> None:
 def _uuid(value: str) -> None:
     if not _UUID_RE.fullmatch(value):
         raise ValueError("bad connection UUID")
+
+
+def _bssid(value: str) -> None:
+    if value and not _BSSID_RE.fullmatch(value):
+        raise ValueError("bad BSSID (expected aa:bb:cc:dd:ee:ff)")
 
 
 def opt(default: Any = dataclasses.MISSING, *, factory: Any = dataclasses.MISSING, choices: tuple = (),
@@ -132,6 +138,12 @@ class TrustedNetwork:
     uuid: str = opt("", check=_uuid)
     name: str = opt("", max_len=200)
     mode: str = opt("pause", choices=("pause", "network_dns"))
+    #: Wi-Fi only: trusted only through this access point ("" = any). Another
+    #: access point with the same network name (an evil twin) is not trusted.
+    bssid: str = opt("", max_len=17, check=_bssid)
+
+    def matches(self, uuid: str, bssid: str) -> bool:
+        return bool(uuid) and uuid == self.uuid and (not self.bssid or self.bssid.lower() == bssid.lower())
 
 
 @dataclass(frozen=True, slots=True)

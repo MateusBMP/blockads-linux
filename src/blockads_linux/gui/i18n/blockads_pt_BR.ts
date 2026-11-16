@@ -670,78 +670,88 @@ StevenBlack Unified, EasyPrivacy, URLhaus/Online Malicious URL Blocklist, Phishi
         <translation>Aguardando download</translation>
     </message>
     <message>
-        <location filename="../pages/filters.py" line="101" />
-        <location filename="../pages/filters.py" line="93" />
+        <location filename="../pages/filters.py" line="184" />
+        <location filename="../pages/filters.py" line="176" />
         <source>Filters</source>
         <translation>Filtros</translation>
     </message>
     <message>
-        <location filename="../pages/filters.py" line="105" />
+        <location filename="../pages/filters.py" line="188" />
         <source>Update now</source>
         <translation>Atualizar agora</translation>
     </message>
     <message>
-        <location filename="../pages/filters.py" line="107" />
+        <location filename="../pages/filters.py" line="190" />
         <source>Update requested; lists are downloaded in the background.</source>
         <translation>Atualização solicitada; as listas são baixadas em segundo plano.</translation>
     </message>
     <message>
-        <location filename="../pages/filters.py" line="120" />
+        <location filename="../pages/filters.py" line="192" />
+        <source>Overlap…</source>
+        <translation>Sobreposição…</translation>
+    </message>
+    <message>
+        <location filename="../pages/filters.py" line="193" />
+        <source>How much the enabled lists duplicate each other</source>
+        <translation>Quanto as listas ativadas repetem umas às outras</translation>
+    </message>
+    <message>
+        <location filename="../pages/filters.py" line="207" />
         <source>Search lists</source>
         <translation>Pesquisar listas</translation>
     </message>
     <message>
-        <location filename="../pages/filters.py" line="139" />
+        <location filename="../pages/filters.py" line="226" />
         <source>Add custom list…</source>
         <translation>Adicionar lista personalizada…</translation>
     </message>
     <message>
-        <location filename="../pages/filters.py" line="141" />
+        <location filename="../pages/filters.py" line="228" />
         <source>Remove custom list</source>
         <translation>Remover lista personalizada</translation>
     </message>
     <message>
-        <location filename="../pages/filters.py" line="146" />
+        <location filename="../pages/filters.py" line="233" />
         <source>Update:</source>
         <translation>Atualizar:</translation>
     </message>
     <message>
-        <location filename="../pages/filters.py" line="150" />
+        <location filename="../pages/filters.py" line="237" />
         <source>Only on unmetered networks</source>
         <translation>Somente em redes sem limite de dados</translation>
     </message>
     <message>
-        <location filename="../pages/filters.py" line="174" />
+        <location filename="../pages/filters.py" line="261" />
         <source>%1 enabled, %2 rules</source>
         <translation>%1 ativadas, %2 regras</translation>
     </message>
     <message>
-        <location filename="../pages/filters.py" line="216" />
+        <location filename="../pages/filters.py" line="303" />
         <source>List enabled; it is downloaded in the background.</source>
         <translation>Lista ativada; ela é baixada em segundo plano.</translation>
     </message>
     <message>
-        <location filename="../pages/filters.py" line="218" />
+        <location filename="../pages/filters.py" line="305" />
         <source>List disabled.</source>
         <translation>Lista desativada.</translation>
     </message>
     <message>
-        <location filename="../pages/filters.py" line="231" />
+        <location filename="../pages/filters.py" line="318" />
         <source>Enter at least one URL.</source>
         <translation>Informe pelo menos uma URL.</translation>
     </message>
     <message>
-        <location filename="../pages/filters.py" line="233" />
+        <location filename="../pages/filters.py" line="320" />
         <source>Custom list added.</source>
         <translation>Lista personalizada adicionada.</translation>
     </message>
     <message>
-        <location filename="../pages/filters.py" line="238" />
+        <location filename="../pages/filters.py" line="325" />
         <source>Custom list removed.</source>
         <translation>Lista personalizada removida.</translation>
     </message>
     <message>
-        <location filename="../pages/filters.py" line="242" />
+        <location filename="../pages/filters.py" line="329" />
         <source>Update schedule saved.</source>
         <translation>Agenda de atualização salva.</translation>
     </message>
@@ -1030,151 +1040,167 @@ Ligar a proteção nunca pede senha. Desligá-la ou permitir um domínio pede a 
 </context><context>
     <name>NetworksPage</name>
     <message>
-        <location filename="../pages/networks.py" line="34" />
+        <location filename="../pages/networks.py" line="37" />
         <source>Pause filtering</source>
         <translation>Pausar a filtragem</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="35" />
+        <location filename="../pages/networks.py" line="38" />
         <source>Keep filtering, use the network's DNS</source>
         <translation>Continuar filtrando, usar o DNS da rede</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="37" />
+        <location filename="../pages/networks.py" line="40" />
         <source>Wi-Fi</source>
         <translation>Wi-Fi</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="38" />
+        <location filename="../pages/networks.py" line="41" />
         <source>Wired</source>
         <translation>Cabeada</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="39" />
+        <location filename="../pages/networks.py" line="42" />
         <source>Mobile broadband</source>
         <translation>Banda larga móvel</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="149" />
-        <location filename="../pages/networks.py" line="40" />
+        <location filename="../pages/networks.py" line="155" />
+        <location filename="../pages/networks.py" line="43" />
         <source>VPN</source>
         <translation>VPN</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="41" />
+        <location filename="../pages/networks.py" line="44" />
         <source>WireGuard</source>
         <translation>WireGuard</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="65" />
-        <location filename="../pages/networks.py" line="50" />
+        <location filename="../pages/networks.py" line="68" />
+        <location filename="../pages/networks.py" line="53" />
         <source>Networks</source>
         <translation>Redes</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="67" />
+        <location filename="../pages/networks.py" line="70" />
         <source>Current network</source>
         <translation>Rede atual</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="175" />
-        <location filename="../pages/networks.py" line="75" />
+        <location filename="../pages/networks.py" line="184" />
+        <location filename="../pages/networks.py" line="78" />
         <source>Trust this network</source>
         <translation>Confiar nesta rede</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="82" />
-        <source>NetworkManager recognizes a Wi-Fi network by its name. Another network with the same name (an "evil twin") would be trusted too: trust only networks you control, and prefer "Keep filtering" for public ones.</source>
-        <translation>O NetworkManager reconhece uma rede Wi-Fi pelo nome. Outra rede com o mesmo nome (um "gêmeo maligno") também seria confiável: confie apenas em redes que você controla e prefira "Continuar filtrando" nas públicas.</translation>
+        <location filename="../pages/networks.py" line="85" />
+        <source>Only through this access point</source>
+        <translation>Só por este ponto de acesso</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="89" />
+        <location filename="../pages/networks.py" line="88" />
+        <source>NetworkManager recognizes a Wi-Fi network by its name. Another network with the same name (an "evil twin") would be trusted too, unless you trust it only through this access point. Trust only networks you control, and prefer "Keep filtering" for public ones.</source>
+        <translation>O NetworkManager reconhece uma rede Wi-Fi pelo nome. Outra rede com o mesmo nome (um "gêmeo maligno") também seria confiável, a menos que você confie nela só por este ponto de acesso. Confie apenas em redes que você controla e prefira "Continuar filtrando" nas públicas.</translation>
+    </message>
+    <message>
+        <location filename="../pages/networks.py" line="95" />
         <source>Trusted networks</source>
         <translation>Redes confiáveis</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="92" />
+        <location filename="../pages/networks.py" line="98" />
         <source>Name</source>
         <translation>Nome</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="92" />
+        <location filename="../pages/networks.py" line="98" />
         <source>When connected</source>
         <translation>Quando conectado</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="102" />
+        <location filename="../pages/networks.py" line="108" />
         <source>No trusted networks. Filtering applies on every network.</source>
         <translation>Nenhuma rede confiável. A filtragem vale em todas as redes.</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="103" />
+        <location filename="../pages/networks.py" line="109" />
         <source>Changes ask for the administrator password. While a VPN is the primary connection, trust follows the VPN's connection, not the network under it.</source>
         <translation>As alterações pedem a senha de administrador. Enquanto uma VPN for a conexão principal, a confiança segue a conexão da VPN, não a rede por baixo dela.</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="108" />
+        <location filename="../pages/networks.py" line="114" />
         <source>Split DNS</source>
         <translation>DNS dividido</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="109" />
+        <location filename="../pages/networks.py" line="115" />
         <source>Domains your networks and VPNs announce are always sent to their own DNS servers, so internal names never leak to the public resolver. A VPN's DNS for everything else is set on the DNS page.</source>
         <translation>Os domínios que suas redes e VPNs anunciam são sempre enviados aos próprios servidores DNS delas, para que nomes internos nunca vazem para o resolvedor público. O uso do DNS de uma VPN para todo o resto é configurado na página DNS.</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="115" />
+        <location filename="../pages/networks.py" line="121" />
         <source>Domain</source>
         <translation>Domínio</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="115" />
+        <location filename="../pages/networks.py" line="121" />
         <source>Interface</source>
         <translation>Interface</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="115" />
+        <location filename="../pages/networks.py" line="121" />
         <source>DNS servers</source>
         <translation>Servidores DNS</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="121" />
+        <location filename="../pages/networks.py" line="127" />
         <source>No network announces its own domains.</source>
         <translation>Nenhuma rede anuncia domínios próprios.</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="163" />
+        <location filename="../pages/networks.py" line="169" />
         <source>No NetworkManager connection is active.</source>
         <translation>Nenhuma conexão do NetworkManager está ativa.</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="174" />
+        <location filename="../pages/networks.py" line="183" />
         <source>Not trusted: filtered with your DNS settings.</source>
         <translation>Não confiável: filtrada com suas configurações de DNS.</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="177" />
-        <source>Trusted: %1</source>
-        <translation>Confiável: %1</translation>
+        <location filename="../pages/networks.py" line="186" />
+        <source>Trusted only through access point %1; this is another one, so it is filtered.</source>
+        <translation>Confiável só pelo ponto de acesso %1; este é outro, então é filtrado.</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="178" />
+        <location filename="../pages/networks.py" line="192" />
+        <location filename="../pages/networks.py" line="189" />
         <source>Change mode</source>
         <translation>Mudar modo</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="198" />
+        <location filename="../pages/networks.py" line="191" />
+        <source>Trusted: %1</source>
+        <translation>Confiável: %1</translation>
+    </message>
+    <message>
+        <location filename="../pages/networks.py" line="210" />
+        <source>(only via %1)</source>
+        <translation>(só via %1)</translation>
+    </message>
+    <message>
+        <location filename="../pages/networks.py" line="221" />
         <source>Remove</source>
         <translation>Remover</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="225" />
-        <location filename="../pages/networks.py" line="219" />
+        <location filename="../pages/networks.py" line="251" />
+        <location filename="../pages/networks.py" line="245" />
         <source>Trusted networks saved.</source>
         <translation>Redes confiáveis salvas.</translation>
     </message>
     <message>
-        <location filename="../pages/networks.py" line="228" />
+        <location filename="../pages/networks.py" line="254" />
         <source>Network removed.</source>
         <translation>Rede removida.</translation>
     </message>
@@ -1271,6 +1297,70 @@ Ligar a proteção nunca pede senha. Desligá-la ou permitir um domínio pede a 
         <location filename="../wizard.py" line="227" />
         <source>Set up BlockAds</source>
         <translation>Configurar o BlockAds</translation>
+    </message>
+</context><context>
+    <name>OverlapDialog</name>
+    <message>
+        <location filename="../pages/filters.py" line="92" />
+        <source>Filter list overlap</source>
+        <translation>Sobreposição das listas de filtros</translation>
+    </message>
+    <message>
+        <location filename="../pages/filters.py" line="95" />
+        <source>Comparing the enabled lists…</source>
+        <translation>Comparando as listas ativadas…</translation>
+    </message>
+    <message>
+        <location filename="../pages/filters.py" line="101" />
+        <location filename="../pages/filters.py" line="101" />
+        <location filename="../pages/filters.py" line="98" />
+        <source>List</source>
+        <translation>Lista</translation>
+    </message>
+    <message>
+        <location filename="../pages/filters.py" line="98" />
+        <source>Domains</source>
+        <translation>Domínios</translation>
+    </message>
+    <message>
+        <location filename="../pages/filters.py" line="98" />
+        <source>Also in another list</source>
+        <translation>Também em outra lista</translation>
+    </message>
+    <message>
+        <location filename="../pages/filters.py" line="99" />
+        <source>Only in this list</source>
+        <translation>Só nesta lista</translation>
+    </message>
+    <message>
+        <location filename="../pages/filters.py" line="101" />
+        <source>Shared domains</source>
+        <translation>Domínios em comum</translation>
+    </message>
+    <message>
+        <location filename="../pages/filters.py" line="112" />
+        <source>Lists that share the most domains:</source>
+        <translation>Listas com mais domínios em comum:</translation>
+    </message>
+    <message>
+        <location filename="../pages/filters.py" line="138" />
+        <source>Enable at least two lists to compare them.</source>
+        <translation>Ative pelo menos duas listas para compará-las.</translation>
+    </message>
+    <message>
+        <location filename="../pages/filters.py" line="141" />
+        <source>%1 lists hold %2 entries for %3 different domains: %4 entries (%5%) are duplicates.</source>
+        <translation>%1 listas têm %2 entradas para %3 domínios diferentes: %4 entradas (%5%) são repetidas.</translation>
+    </message>
+    <message>
+        <location filename="../pages/filters.py" line="161" />
+        <source>Every domain of %1 is also in another list: disabling it alone would unblock nothing.</source>
+        <translation>Todo domínio de %1 também está em outra lista: desativá-la sozinha não desbloquearia nada.</translation>
+    </message>
+    <message>
+        <location filename="../pages/filters.py" line="164" />
+        <source>Not compared (not downloaded yet): %1</source>
+        <translation>Não comparadas (ainda não baixadas): %1</translation>
     </message>
 </context><context>
     <name>Page</name>

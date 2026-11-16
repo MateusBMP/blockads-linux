@@ -50,15 +50,25 @@ class PolicyConfig:
     network_tier: bool = True  # tier 7 (off when the user picked the fallback explicitly)
     #: NetworkManager connection UUIDs of trusted networks in "network_dns" mode (tier 3).
     network_dns_uuids: frozenset[str] = frozenset()
+    #: (UUID, BSSID) of those pinned to one access point: trusted only through it.
+    network_dns_pins: frozenset[tuple[str, str]] = frozenset()
 
     def __post_init__(self) -> None:
         for name in ("configured", "fallback", "rescue"):
             object.__setattr__(self, name, tuple(getattr(self, name)))
         object.__setattr__(self, "network_dns_uuids", frozenset(self.network_dns_uuids))
+        object.__setattr__(self, "network_dns_pins",
+                           frozenset((uuid, bssid.lower()) for uuid, bssid in self.network_dns_pins))
         if not self.configured and not self.system:
             raise ValueError("no configured upstream")
         if self.encrypted_only and (self.system or not all(spec.encrypted for spec in self.configured)):
             raise ValueError("encrypted only needs encrypted upstreams (DoH or DoT)")
+
+    def trusts_network_dns(self, uuid: str, bssid: str) -> bool:
+        if not uuid or uuid not in self.network_dns_uuids:
+            return False
+        pins = {pin for u, pin in self.network_dns_pins if u == uuid}
+        return not pins or bssid.lower() in pins
 
 
 class UpstreamPolicy:
@@ -89,7 +99,7 @@ class UpstreamPolicy:
         used: set[UpstreamSpec] = set()
         tiers: list[tuple[str, Sequence[UpstreamSpec]]] = []
         self.trusted_dns = bool(network) and not config.encrypted_only and not config.system \
-            and bool(state.primary_uuid) and state.primary_uuid in config.network_dns_uuids
+            and config.trusts_network_dns(state.primary_uuid, state.primary_bssid)
         if self.trusted_dns:
             tiers.append(("trusted", network))
         if config.vpn_dns and self.router.vpn:

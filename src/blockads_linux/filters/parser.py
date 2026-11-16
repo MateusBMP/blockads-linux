@@ -2,7 +2,7 @@
 
 A line-by-line port of blockads-android's DNS rule extraction
 (``tunnel/internal/trie/parser.go: parseDomainLine`` and the line handling in
-``compiler.go: CompileFilterList``, upstream revision fc95d66a), so that a
+``compiler.go: CompileFilterList``, upstream revision 5d1184d1), so that a
 list yields exactly the same blocked domains as on Android.
 
 Documented deviations ("@@ exceptions"):
@@ -29,6 +29,11 @@ import re
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
+#: Bumped whenever a change here alters what a list compiles to. The updater
+#: recompiles a list whose manifest entry has another version, even when its
+#: source is unchanged. 1: upstream fc95d66a; 2: upstream 5d1184d1 (modifiers).
+PARSER_VERSION = 2
+
 #: Upstream's bufio.Scanner limit; longer lines are skipped here.
 MAX_LINE_LENGTH = 1024 * 1024
 
@@ -41,10 +46,14 @@ _GO_SPACE = (
 _GO_FIELDS_SPLIT = re.compile("[" + re.escape(_GO_SPACE) + "]+")
 
 _COSMETIC_MARKERS = ("##", "#@#", "#?#", "#$#", "#%#")
-_ALLOWED_OPTIONS = frozenset(
-    {"", "important", "empty", "mp4", "all", "popup", "document", "doc", "dns", "cname", "network"}
-)
-_ALLOWED_OPTION_PREFIXES = ("dnstype", "ctag", "denyallow")
+# Modifiers that keep an ABP rule a whole-domain DNS block. Browser-only ones
+# ($popup, $document, $doc, $empty, $mp4) drop the rule: blocking the whole
+# domain for them over-blocks (upstream d1b215c1).
+_ALLOWED_OPTIONS = frozenset({"", "important", "all", "dns", "cname", "network"})
+_ALLOWED_OPTION_PREFIXES = ("dnstype", "ctag")
+# $denyallow= only on a single-label name (||*.africa^$denyallow=...): a TLD-wide
+# block with exceptions. On a full domain it would block more than the rule means.
+_DENYALLOW_PREFIX = "denyallow="
 _REJECTED_NAMES = frozenset({"", "localhost", "localhost.localdomain", "local", "broadcasthost"})
 _LABEL_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789-_")
 _DIGITS = frozenset("0123456789")
@@ -83,12 +92,16 @@ def _is_ipv4_literal(domain: str) -> bool:
     return True
 
 
-def _options_allowed(options: str) -> tuple[bool, bool]:
+def _options_allowed(options: str, single_label: bool) -> tuple[bool, bool]:
     """Return (all options allowed, has $important)."""
     important = False
     for raw in options.split(","):
-        opt = go_trim_space(raw)
-        if opt in _ALLOWED_OPTIONS or opt.startswith(_ALLOWED_OPTION_PREFIXES):
+        opt = go_to_lower(go_trim_space(raw))
+        if (
+            opt in _ALLOWED_OPTIONS
+            or opt.startswith(_ALLOWED_OPTION_PREFIXES)
+            or (single_label and opt.startswith(_DENYALLOW_PREFIX))
+        ):
             important = important or opt == "important"
             continue
         return False, False
@@ -128,7 +141,9 @@ def _parse(line: str) -> tuple[str, bool]:
             return "", False
         dollar = domain.find("$")
         if dollar != -1:
-            allowed, important = _options_allowed(domain[dollar + 1 :])
+            name = domain[:dollar].removesuffix("^")
+            single_label = name != "" and "." not in name
+            allowed, important = _options_allowed(domain[dollar + 1 :], single_label)
             if not allowed:
                 return "", False
             domain = domain[:dollar]

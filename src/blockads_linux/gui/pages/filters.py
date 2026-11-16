@@ -26,7 +26,7 @@ from PyQt6.QtWidgets import (
 )
 
 from .. import format as fmt
-from .base import Context, Page, heading, plain
+from .base import Context, Page, error_text, heading, plain
 from ..format import QT_TRANSLATE_NOOP
 
 CATEGORY_LABELS = {
@@ -84,6 +84,89 @@ class CustomListDialog(QDialog):
         return {"name": self.name.text().strip() or "Custom list", "urls": urls}
 
 
+class OverlapDialog(QDialog):
+    """How much the enabled lists duplicate each other (GetFilterOverlap)."""
+
+    def __init__(self, ctx: Context, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(self.tr("Filter list overlap"))
+        self.resize(720, 520)
+        layout = QVBoxLayout(self)
+        self.summary = plain(self.tr("Comparing the enabled lists…"))
+        layout.addWidget(self.summary)
+        self.lists = QTableWidget(0, 4)
+        self.lists.setHorizontalHeaderLabels([self.tr("List"), self.tr("Domains"), self.tr("Also in another list"),
+                                              self.tr("Only in this list")])
+        self.pairs = QTableWidget(0, 3)
+        self.pairs.setHorizontalHeaderLabels([self.tr("List"), self.tr("List"), self.tr("Shared domains")])
+        for table in (self.lists, self.pairs):
+            table.verticalHeader().setVisible(False)
+            table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+            table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+            header = table.horizontalHeader()
+            header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+            for column in range(1, table.columnCount()):
+                header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+        self.pairs.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(self.lists, 3)
+        layout.addWidget(plain(self.tr("Lists that share the most domains:")))
+        layout.addWidget(self.pairs, 2)
+        self.note = plain()
+        layout.addWidget(self.note)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        ctx.client.call("GetFilterOverlap").then(self.show_report, self.failed)
+
+    def failed(self, error: Any) -> None:
+        self.summary.setText(error_text(error))
+
+    def show_report(self, report: dict[str, Any]) -> None:
+        names = report.get("names", {})
+
+        def name(list_id: str) -> str:
+            return fmt.safe(names.get(list_id, list_id), 120)
+
+        def cell(text: str, number: bool = False) -> QTableWidgetItem:
+            item = QTableWidgetItem(text)
+            if number:
+                item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            return item
+
+        rows = sorted(report.get("lists", []), key=lambda r: -r["shared_percent"])
+        if len(rows) < 2:
+            self.summary.setText(self.tr("Enable at least two lists to compare them."))
+        else:
+            self.summary.setText(
+                self.tr("%1 lists hold %2 entries for %3 different domains: %4 entries (%5%) are duplicates.")
+                .replace("%1", str(len(rows))).replace("%2", fmt.number(report["total_entries"]))
+                .replace("%3", fmt.number(report["unique_domains"]))
+                .replace("%4", fmt.number(report["redundant_entries"]))
+                .replace("%5", f"{report['redundancy_percent']:.1f}"))
+        self.lists.setRowCount(len(rows))
+        for row, entry in enumerate(rows):
+            self.lists.setItem(row, 0, cell(name(entry["id"])))
+            self.lists.setItem(row, 1, cell(fmt.number(entry["total"]), True))
+            self.lists.setItem(row, 2, cell(f"{fmt.number(entry['shared'])} ({entry['shared_percent']:.1f}%)", True))
+            self.lists.setItem(row, 3, cell(fmt.number(entry["unique"]), True))
+        pairs = report.get("pairs", [])[:10]
+        self.pairs.setRowCount(len(pairs))
+        for row, pair in enumerate(pairs):
+            self.pairs.setItem(row, 0, cell(name(pair["a"])))
+            self.pairs.setItem(row, 1, cell(name(pair["b"])))
+            self.pairs.setItem(row, 2, cell(fmt.number(pair["shared"]), True))
+        notes = []
+        covered = [name(r["id"]) for r in rows if r["total"] and r["unique"] == 0]
+        if covered and len(rows) > 1:
+            notes.append(self.tr("Every domain of %1 is also in another list: disabling it alone would unblock "
+                                 "nothing.").replace("%1", ", ".join(covered)))
+        if report.get("missing"):
+            notes.append(self.tr("Not compared (not downloaded yet): %1")
+                         .replace("%1", ", ".join(name(i) for i in report["missing"])))
+        self.note.setText("\n".join(notes))
+        self.note.setVisible(bool(notes))
+
+
 class FiltersPage(Page):
     title = "Filters"
     icon = "view-filter"
@@ -106,6 +189,10 @@ class FiltersPage(Page):
         self.update_button.clicked.connect(lambda: self.act(
             "UpdateFiltersNow", done=self.tr("Update requested; lists are downloaded in the background.")))
         top.addWidget(self.update_button)
+        self.overlap_button = QPushButton(self.tr("Overlap…"))
+        self.overlap_button.setToolTip(self.tr("How much the enabled lists duplicate each other"))
+        self.overlap_button.clicked.connect(lambda: OverlapDialog(self.ctx, self).exec())
+        top.addWidget(self.overlap_button)
         layout.addLayout(top)
 
         self.tabs = QTabBar()

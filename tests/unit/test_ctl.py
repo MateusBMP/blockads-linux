@@ -153,6 +153,13 @@ def test_blockadsctl_end_to_end(tmp_path):
                     await ctl("networks", "add", home, "--name", "Home", "--mode", "network_dns")
                     out, _ = await ctl("networks")
                     assert home in out and "network_dns" in out and "Home" in out
+                    _, err = await ctl("networks", "add", home, "--pin-ap", check=1)
+                    assert "--pin-ap needs the current connection" in err
+                    _, err = await ctl("networks", "add", home, "--bssid", "not-a-mac", check=1)
+                    assert "BSSID" in err
+                    await ctl("networks", "add", home, "--name", "Home", "--bssid", "AA:BB:CC:DD:EE:01")
+                    out, _ = await ctl("networks")
+                    assert "[only via aa:bb:cc:dd:ee:01]" in out and out.count(home) == 1
                     await ctl("networks", "remove", home)
                     assert "No trusted networks." in (await ctl("networks", "list"))[0]
                     _, err = await ctl("networks", "remove", home, check=1)

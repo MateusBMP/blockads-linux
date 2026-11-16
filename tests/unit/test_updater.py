@@ -1,6 +1,7 @@
 """Tests for the updater run (updater.run, updater.manifest, updater.__main__)."""
 
 import asyncio
+import dataclasses
 import json
 
 import pytest
@@ -9,6 +10,7 @@ from blockads_linux.common.atomic import write_json
 from blockads_linux.common.paths import Paths
 from blockads_linux.filters.artifact import LoadedArtifact
 from blockads_linux.filters.catalog import Catalog, CatalogEntry
+from blockads_linux.filters.parser import PARSER_VERSION
 from blockads_linux.updater import manifest as mf
 from blockads_linux.updater.__main__ import main as update_main
 from blockads_linux.updater.fetch import Fetcher
@@ -263,12 +265,44 @@ def test_concurrent_runs_are_refused(world, monkeypatch):
 
 def test_is_due():
     target = Target("x", ("https://a.example/x",))
-    entry = ListEntry("0" * 64 + ".bkf", 10, NOW, NOW, NOW, (Source("https://a.example/x"),))
+    entry = ListEntry("0" * 64 + ".bkf", 10, NOW, NOW, NOW, (Source("https://a.example/x"),), "", PARSER_VERSION)
     assert is_due(target, None, 24, NOW)
     assert not is_due(target, entry, 24, NOW + 3600)
     assert is_due(target, entry, 24, NOW + 24 * 3600)
     assert is_due(Target("x", ("https://b.example/x",)), entry, 24, NOW)  # URL changed
     assert is_due(target, entry, 24, NOW - 2 * 86400)  # checked "in the future"
+
+
+def test_is_due_after_a_parser_change():
+    target = Target("x", ("https://a.example/x",))
+    old = ListEntry("0" * 64 + ".bkf", 10, NOW, NOW, NOW, (Source("https://a.example/x"),), "", PARSER_VERSION - 1)
+    assert is_due(target, old, 24, NOW + 60)  # compiled by an older parser: due at once
+    assert is_due(target, old, 0, NOW + 60)  # even with automatic updates off
+    failed = dataclasses.replace(old, error="timeout")
+    assert not is_due(target, failed, 24, NOW + 60)  # a failed attempt waits for the retry delay
+
+
+def test_parser_change_recompiles_an_unchanged_list(world):
+    async def scenario():
+        world.settings()
+        await world.run()
+        m = world.manifest()
+        assert all(e.parser == PARSER_VERSION for e in m.lists.values())
+        stale = dict(m.lists, list_a=dataclasses.replace(m.lists["list_a"], parser=PARSER_VERSION - 1))
+        write_json(world.paths.manifest, mf.Manifest(m.generation, m.updated_at, stale).to_dict())
+        before = world.requests()
+        world.clock.now += 3600  # nothing else is due
+        status = await world.run()
+        assert status["summary"] == {"updated": 1, "unchanged": 0, "failed": 0}
+        assert set(status["lists"]) == {"list_a"}
+        new = world.server.requests[before:]
+        assert len(new) == 1 and not new[0].headers.get("if-none-match")  # full fetch, no ETag
+        entry = world.manifest().lists["list_a"]
+        assert entry.parser == PARSER_VERSION and entry.rules == 100 and entry.compiled_at == NOW + 3600
+        status = await world.run()  # done once
+        assert status["lists"] == {}
+
+    run(world, scenario)
 
 
 def test_manifest_validation(tmp_path):

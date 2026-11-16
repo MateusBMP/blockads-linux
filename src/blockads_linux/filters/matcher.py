@@ -78,6 +78,10 @@ class FilterMatcher:
         self._cached = functools.lru_cache(maxsize=cache_size)(self._match_uncached) if cache_size else None
 
     @property
+    def lists(self) -> tuple[FilterList, ...]:
+        return self._lists
+
+    @property
     def list_ids(self) -> tuple[str, ...]:
         return tuple(f.list_id for f in self._lists)
 

@@ -402,3 +402,42 @@ def test_resolved_dns_over_tls_mode():
     assert state_of(data).resolved_dot == "yes"
     data["get_all"][key]["DNSOverTLS"] = "bogus"
     assert state_of(data).resolved_dot == ""
+
+
+# --- Wi-Fi access point (trusted networks pinned to a BSSID) ----------------------
+
+
+def wifi_data(bssid, kind="802-11-wireless"):
+    data = nm_data(active=[(kind, True, "wlan0", False)])
+    base = f"{NM} /org/freedesktop/NetworkManager"
+    data["get_all"][f"{base}/Devices/1 {netmon.NM_WIRELESS_IFACE}"] = {
+        "ActiveAccessPoint": "/org/freedesktop/NetworkManager/AccessPoint/7", "Bitrate": 300000}
+    data["get_all"][f"{base}/AccessPoint/7 {netmon.NM_AP_IFACE}"] = {"HwAddress": bssid, "Strength": 70}
+    return data
+
+
+def test_primary_bssid():
+    assert state_of(wifi_data("AA:BB:CC:DD:EE:01")).primary_bssid == "aa:bb:cc:dd:ee:01"
+    assert state_of(wifi_data("00:00:00:00:00:00")).primary_bssid == ""  # NetworkManager's "unknown"
+    assert state_of(wifi_data("garbage")).primary_bssid == ""
+    assert state_of(wifi_data("aa:bb:cc:dd:ee:01", kind="802-3-ethernet")).primary_bssid == ""
+    no_ap = wifi_data("aa:bb:cc:dd:ee:01")
+    no_ap["get_all"][f"{NM} /org/freedesktop/NetworkManager/Devices/1 {netmon.NM_WIRELESS_IFACE}"] = {
+        "ActiveAccessPoint": "/"}
+    assert state_of(no_ap).primary_bssid == ""
+    # Roaming to another access point is a state change.
+    assert state_of(wifi_data("aa:bb:cc:dd:ee:01")) != state_of(wifi_data("aa:bb:cc:dd:ee:02"))
+
+
+def test_reason_for_wireless_signals():
+    from types import SimpleNamespace
+
+    from jeepney.low_level import HeaderFields
+
+    def signal(interface, changed):
+        return SimpleNamespace(header=SimpleNamespace(fields={HeaderFields.member: "PropertiesChanged"}),
+                               body=(interface, changed, []))
+
+    assert netmon._reason(signal(netmon.NM_WIRELESS_IFACE, {"ActiveAccessPoint": ("o", "/x")})) == "network"
+    assert netmon._reason(signal(netmon.NM_WIRELESS_IFACE, {"Bitrate": ("u", 1)})) is None
+    assert netmon._reason(signal(netmon.NM_AP_IFACE, {"Strength": ("y", 1)})) is None

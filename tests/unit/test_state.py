@@ -238,3 +238,24 @@ def test_trusted_network(tmp_path, mode):
         assert manager.protection_state == "active" and not policies[-1].paused
     manager.set_network("other")
     assert manager.protection_state == "active" and not policies[-1].paused
+
+
+@pytest.mark.parametrize("mode", ["pause", "network_dns"])
+def test_trusted_network_pinned_to_an_access_point(tmp_path, mode):
+    paths = setup_state(tmp_path)
+    document = Settings().to_dict()
+    document["filters"]["enabled"] = ["sec_list", "ads_list"]
+    document["trusted_networks"] = [{"uuid": HOME, "name": "Home", "mode": mode, "bssid": "aa:bb:cc:dd:ee:01"}]
+    write_json(paths.settings, document)
+    policies = []
+    manager = StateManager(paths, catalog=CATALOG, on_policy=policies.append)
+    manager.load()
+    if mode == "network_dns":
+        assert manager.upstream_config.network_dns_pins == frozenset({(HOME, "aa:bb:cc:dd:ee:01")})
+    manager.set_network(HOME, "aa:bb:cc:dd:ee:02")  # same connection profile, another access point
+    assert manager.trusted is None and manager.protection_state == "active"
+    manager.set_network(HOME, "AA:BB:CC:DD:EE:01")
+    assert manager.trusted.name == "Home"
+    assert manager.protection_state == ("trusted" if mode == "pause" else "active")
+    manager.set_network(HOME, "")  # access point unknown: not trusted
+    assert manager.trusted is None and not policies[-1].paused

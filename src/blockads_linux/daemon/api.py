@@ -35,6 +35,7 @@ from ..common.settings import (
     rule_counts,
 )
 from ..filters.catalog import CATEGORIES
+from ..filters.overlap import analyze as analyze_overlap
 from ..filters.custom_rules import CustomRuleType, CustomVerdict, entries_match, is_valid_domain, parse_rule
 from .health import Health
 from .logstore import LogStore
@@ -101,6 +102,8 @@ class DaemonApi:
         self.clock = clock
         self.started = time.monotonic()
         self._write = asyncio.Lock()
+        self._overlap_lock = asyncio.Lock()
+        self._overlap: tuple[tuple[tuple[str, str], ...], dict[str, Any]] | None = None
 
     # --- view ----------------------------------------------------------------
 
@@ -139,6 +142,7 @@ class DaemonApi:
                 "uuid": network.primary_uuid,
                 "name": network.primary_name,
                 "type": network.primary_type,
+                "bssid": network.primary_bssid,
                 "vpn": network.vpn_active,
                 "captive": network.captive,
                 "metered": network.metered.metered,
@@ -207,6 +211,25 @@ class DaemonApi:
         return dumps({"revision": state.catalog.revision, "categories": list(CATEGORIES), "lists": catalog,
                       "custom": custom, "update_interval_hours": filters.update_interval_hours,
                       "unmetered_only": filters.unmetered_only})
+
+    async def GetFilterOverlap(self) -> str:
+        """Overlap between the enabled, loaded lists (counts only; no domain names).
+
+        One k-way merge of the lists' hashes, in a worker thread (about 1 s per
+        600k entries; DNS keeps being served between GIL switches). Computed once
+        per set of loaded artifacts.
+        """
+        async with self._overlap_lock:
+            lists = self.state.policy.matcher.lists
+            key = tuple((f.list_id, f.artifact.info.name) for f in lists)
+            if self._overlap is None or self._overlap[0] != key:
+                report = await asyncio.to_thread(analyze_overlap, [(f.list_id, f.artifact.block) for f in lists])
+                self._overlap = key, report.to_dict()
+            result = self._overlap[1]
+        names = {e.id: e.name for e in self.state.catalog.entries}
+        names.update((c.id, c.name) for c in self.state.settings.filters.custom)
+        return dumps({**result, "generation": self.state.generation, "missing": list(self.state.missing),
+                      "names": {list_id: names.get(list_id, list_id) for list_id, _ in key}})
 
     async def GetSettings(self) -> str:
         return dumps({"settings": self.state.settings.to_dict(), "read_only": self.state.settings_read_only})

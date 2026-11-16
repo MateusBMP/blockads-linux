@@ -48,6 +48,7 @@ class ListEntry:
     changed_at: int = 0  # last time the content changed
     sources: tuple[Source, ...] = ()
     error: str = ""  # last attempt's error; the artifact (if any) is the last good one
+    parser: int = 0  # filters.parser.PARSER_VERSION the artifact was compiled with
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,7 +67,7 @@ class Manifest:
             "updated_at": self.updated_at,
             "lists": {list_id: {
                 "artifact": e.artifact, "rules": e.rules, "compiled_at": e.compiled_at,
-                "checked_at": e.checked_at, "changed_at": e.changed_at, "error": e.error,
+                "checked_at": e.checked_at, "changed_at": e.changed_at, "error": e.error, "parser": e.parser,
                 "sources": [{"url": s.url, "sha256": s.sha256, "size": s.size, "etag": s.etag,
                              "last_modified": s.last_modified} for s in e.sources],
             } for list_id, e in sorted(self.lists.items())},
@@ -91,7 +92,7 @@ class Manifest:
                             for s in raw.get("sources", []) if isinstance(s, dict))
             lists[list_id] = ListEntry(artifact, _int(raw.get("rules", 0)), _int(raw.get("compiled_at", 0)),
                                        _int(raw.get("checked_at", 0)), _int(raw.get("changed_at", 0)),
-                                       sources, _text(raw.get("error", "")))
+                                       sources, _text(raw.get("error", "")), _int(raw.get("parser", 0)))
         return cls(_int(document.get("generation", 0)), _int(document.get("updated_at", 0)), lists)
 
 

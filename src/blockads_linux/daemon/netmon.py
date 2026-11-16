@@ -24,6 +24,7 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import logging
+import re
 import socket
 from collections.abc import Awaitable, Callable, Iterable, Mapping
 from dataclasses import dataclass, field, replace
@@ -46,6 +47,8 @@ NM_DNS_PATH = "/org/freedesktop/NetworkManager/DnsManager"
 NM_DNS_IFACE = "org.freedesktop.NetworkManager.DnsManager"
 NM_ACTIVE_IFACE = "org.freedesktop.NetworkManager.Connection.Active"
 NM_DEVICE_IFACE = "org.freedesktop.NetworkManager.Device"
+NM_WIRELESS_IFACE = "org.freedesktop.NetworkManager.Device.Wireless"
+NM_AP_IFACE = "org.freedesktop.NetworkManager.AccessPoint"
 RESOLVED_BUS = "org.freedesktop.resolve1"
 RESOLVED_PATH = "/org/freedesktop/resolve1"
 RESOLVED_IFACE = "org.freedesktop.resolve1.Manager"
@@ -57,6 +60,8 @@ PROPERTIES_IFACE = "org.freedesktop.DBus.Properties"
 
 NM_ACTIVATED = 2  # NMActiveConnectionState
 VPN_TYPES = frozenset({"vpn", "wireguard"})  # connection types that count as a VPN
+WIFI_TYPE = "802-11-wireless"
+_BSSID_RE = re.compile(r"[0-9a-f]{2}(:[0-9a-f]{2}){5}")
 
 
 class Connectivity(IntEnum):
@@ -105,6 +110,7 @@ class NetworkState:
     primary_uuid: str = ""
     primary_name: str = ""  # the connection's id ("Home Wi-Fi"), for the Networks page
     primary_type: str = ""  # NetworkManager connection type ("802-11-wireless", "802-3-ethernet", "vpn", ...)
+    primary_bssid: str = ""  # Wi-Fi: the access point's BSSID, lowercase ("" otherwise or unknown)
     vpn_active: bool = False
     connectivity_check_host: str = ""  # NetworkManager's probe host (internal allowlist)
     links: tuple[LinkDns, ...] = field(default=())
@@ -227,7 +233,7 @@ async def _read_networkmanager(source: PropertySource) -> NetworkState | None:
     interfaces: dict[str, tuple[str, bool]] = {}
     vpn_active = False
     vpn_default = False  # a VPN-plugin connection owns a default route
-    primary_uuid = primary_name = primary_type = ""
+    primary_uuid = primary_name = primary_type = primary_bssid = ""
     primary = str(nm.get("PrimaryConnection", "/"))
     for path in nm.get("ActiveConnections", ()):
         active = await source.get_all(NM_BUS, path, NM_ACTIVE_IFACE)
@@ -241,6 +247,8 @@ async def _read_networkmanager(source: PropertySource) -> NetworkState | None:
             primary_uuid = str(active.get("Uuid", ""))
             primary_name = str(active.get("Id", ""))
             primary_type = kind
+            if kind == WIFI_TYPE:
+                primary_bssid = await _access_point_bssid(source, active.get("Devices", ()))
         if kind == "vpn":
             # A VPN plugin's Devices is the device it runs over (wlan0), not
             # its tunnel; its DNS entries carry the "vpn" flag instead.
@@ -276,6 +284,7 @@ async def _read_networkmanager(source: PropertySource) -> NetworkState | None:
         primary_uuid=primary_uuid,
         primary_name=primary_name,
         primary_type=primary_type,
+        primary_bssid=primary_bssid,
         vpn_active=vpn_active,
         connectivity_check_host=urlsplit(str(nm.get("ConnectivityCheckUri", ""))).hostname or "",
         links=tuple(links),
@@ -289,6 +298,20 @@ async def _read_networkmanager(source: PropertySource) -> NetworkState | None:
         vpn_interfaces=frozenset(name for name, (kind, _) in interfaces.items() if kind in VPN_TYPES)
         | frozenset(link.interface for link in links if link.vpn),
     )
+
+
+async def _access_point_bssid(source: PropertySource, devices: Iterable[Any]) -> str:
+    """The BSSID of the access point a Wi-Fi connection uses, lowercase, or ""."""
+    for device_path in devices:
+        wireless = await source.get_all(NM_BUS, str(device_path), NM_WIRELESS_IFACE)
+        ap_path = str((wireless or {}).get("ActiveAccessPoint", "/"))
+        if ap_path in ("", "/"):
+            continue
+        ap = await source.get_all(NM_BUS, ap_path, NM_AP_IFACE)
+        bssid = str((ap or {}).get("HwAddress", "")).lower()
+        if _BSSID_RE.fullmatch(bssid) and bssid != "00:00:00:00:00:00":
+            return bssid
+    return ""
 
 
 async def _read_resolved(source: PropertySource, if_name: Callable[[int], str]) -> NetworkState | None:
@@ -491,6 +514,10 @@ def _reason(message: Message) -> str | None:
     """"resume", "network", or None for a signal that changes nothing we read."""
     member = message.header.fields.get(HeaderFields.member)
     body = message.body or ()
+    if member == "PropertiesChanged" and body and body[0] == NM_WIRELESS_IFACE:
+        # Roaming to another access point; Bitrate and the like change often and are ignored.
+        changed = body[1] if len(body) > 1 and isinstance(body[1], dict) else {}
+        return "network" if "ActiveAccessPoint" in changed else None
     if member == "PrepareForSleep":
         return "resume" if body and not body[0] else None
     if member == "NameOwnerChanged":

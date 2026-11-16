@@ -59,6 +59,7 @@ METHODS: dict[str, Method] = {m.name: m for m in (
     _m("GetStatus", "", "s", VIEW, out="status_json"),
     _m("GetStatistics", "s", "s", VIEW, ("period",), out="statistics_json"),
     _m("GetFilterCatalog", "", "s", VIEW, out="catalog_json"),
+    _m("GetFilterOverlap", "", "s", VIEW, out="overlap_json"),
     _m("GetSettings", "", "s", VIEW, out="settings_json"),
     _m("GetRules", "", "s", VIEW, out="rules_json"),
     _m("TestDomain", "s", "s", VIEW, ("domain",), out="verdict_json"),

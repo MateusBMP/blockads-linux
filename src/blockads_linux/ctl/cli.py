@@ -343,7 +343,37 @@ def run_filters(args: argparse.Namespace, client: Client) -> int:
         print(client.call("AddCustomFilter", json.dumps({"name": args.name, "urls": args.urls})))
     elif action == "remove":
         client.call("RemoveCustomFilter", args.id)
+    elif action == "overlap":
+        print_overlap(client.json("GetFilterOverlap"), args.json)
     return 0
+
+
+def print_overlap(report: dict[str, Any], as_json: bool) -> None:
+    if as_json:
+        print(json.dumps(report, indent=2))
+        return
+    names = report.get("names", {})
+    lists = report["lists"]
+    if len(lists) < 2:
+        print("Fewer than two filter lists are loaded: nothing to compare.")
+        return
+    print(f"{len(lists)} lists, {report['total_entries']:,} entries, {report['unique_domains']:,} unique domains; "
+          f"{report['redundant_entries']:,} entries ({report['redundancy_percent']:.1f}%) are duplicates.")
+    print(f"\n{'List':<44} {'Domains':>10} {'Also elsewhere':>15} {'Only here':>10}")
+    for row in sorted(lists, key=lambda r: -r["shared_percent"]):
+        name = _safe(names.get(row["id"], row["id"]))[:44]
+        print(f"{name:<44} {row['total']:>10,} {row['shared']:>8,} {row['shared_percent']:>5.1f}% {row['unique']:>10,}")
+    if report["pairs"]:
+        print("\nMost shared pairs:")
+        for pair in report["pairs"][:10]:
+            a, b = (_safe(names.get(i, i)) for i in (pair["a"], pair["b"]))
+            print(f"  {pair['shared']:>10,}  {a} + {b}")
+    covered = [r for r in lists if r["total"] and r["unique"] == 0]
+    for row in covered:
+        print(f"\nEvery domain of {_safe(names.get(row['id'], row['id']))} is also in another list: "
+              f"disabling it alone would unblock nothing.")
+    if report.get("missing"):
+        print(f"\nNot compared (not downloaded yet): {', '.join(report['missing'])}")
 
 
 def collect_diagnostics(client: Client, helper: str) -> dict[str, Any]:
@@ -373,22 +403,34 @@ def run_networks(args: argparse.Namespace, client: Client) -> int:
         if getattr(args, "json", False):
             print(json.dumps(networks, indent=2))
             return 0
-        current = (client.json("GetStatus").get("network") or {}).get("uuid", "")
+        current = client.json("GetStatus").get("network") or {}
+        uuid, bssid = current.get("uuid", ""), current.get("bssid", "").lower()
         for network in networks:
-            mark = "*" if network["uuid"] == current else " "
-            print(f"{mark} {network['uuid']:<36}  {network['mode']:<11}  {_safe(network['name'])}")
+            pin = network.get("bssid", "").lower()
+            active = network["uuid"] == uuid and (not pin or pin == bssid)
+            mark = "*" if active else " "
+            where = f"  [only via {pin}]" if pin else ""
+            print(f"{mark} {network['uuid']:<36}  {network['mode']:<11}  {_safe(network['name'])}{where}")
         if not networks:
             print("No trusted networks.")
+        if bssid:
+            print(f"Current access point: {bssid}")
         return 0
     if action == "add":
-        uuid, name = args.uuid, args.name
+        uuid, name, bssid = args.uuid, args.name, (args.bssid or "").lower()
+        network = (client.json("GetStatus").get("network") or {}) if uuid is None or args.pin_ap else {}
         if uuid is None:
-            network = client.json("GetStatus").get("network") or {}
             uuid = network.get("uuid", "")
             if not uuid:
                 raise CtlError("no active NetworkManager connection; pass its UUID (nmcli -f NAME,UUID connection)")
             name = name or network.get("name", "")
+        if args.pin_ap:
+            if network.get("uuid") != uuid or not network.get("bssid"):
+                raise CtlError("--pin-ap needs the current connection to be that Wi-Fi network; or pass --bssid")
+            bssid = network["bssid"].lower()
         entry = {"uuid": uuid, "name": name or "", "mode": args.mode}
+        if bssid:
+            entry["bssid"] = bssid
         networks = [n for n in networks if n["uuid"] != uuid] + [entry]
     elif action == "remove":
         kept = [n for n in networks if n["uuid"] != args.uuid]
@@ -493,6 +535,7 @@ def build_parser() -> argparse.ArgumentParser:
     fp.add_argument("urls", nargs="+", metavar="URL")
     fp = fsub.add_parser("remove", help="remove a custom list")
     fp.add_argument("id")
+    fsub.add_parser("overlap", help="how much the enabled lists duplicate each other")
 
     p = sub.add_parser("log", help="recent queries")
     p.add_argument("-n", "--limit", type=int, default=50)
@@ -538,6 +581,10 @@ def build_parser() -> argparse.ArgumentParser:
     np_.add_argument("--name", help="label (default: the connection's name)")
     np_.add_argument("--mode", choices=("pause", "network_dns"), default="pause",
                      help="pause: no filtering; network_dns: keep filtering, use the network's DNS")
+    pin = np_.add_mutually_exclusive_group()
+    pin.add_argument("--pin-ap", action="store_true",
+                     help="Wi-Fi: trust it only through the current access point (not a look-alike network)")
+    pin.add_argument("--bssid", metavar="MAC", help="Wi-Fi: trust it only through this access point")
     np_ = nsub.add_parser("remove")
     np_.add_argument("uuid")
     p = sub.add_parser("reset", help="reset every setting to its default")

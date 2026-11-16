@@ -432,8 +432,12 @@ T = {
         "As alterações pedem a senha de administrador. Enquanto uma VPN for a conexão principal, a confiança segue a conexão da VPN, não a rede por baixo dela.",
     "Domains your networks and VPNs announce are always sent to their own DNS servers, so internal names never leak to the public resolver. A VPN's DNS for everything else is set on the DNS page.":
         "Os domínios que suas redes e VPNs anunciam são sempre enviados aos próprios servidores DNS delas, para que nomes internos nunca vazem para o resolvedor público. O uso do DNS de uma VPN para todo o resto é configurado na página DNS.",
-    'NetworkManager recognizes a Wi-Fi network by its name. Another network with the same name (an "evil twin") would be trusted too: trust only networks you control, and prefer "Keep filtering" for public ones.':
-        'O NetworkManager reconhece uma rede Wi-Fi pelo nome. Outra rede com o mesmo nome (um "gêmeo maligno") também seria confiável: confie apenas em redes que você controla e prefira "Continuar filtrando" nas públicas.',
+    'NetworkManager recognizes a Wi-Fi network by its name. Another network with the same name (an "evil twin") would be trusted too, unless you trust it only through this access point. Trust only networks you control, and prefer "Keep filtering" for public ones.':
+        'O NetworkManager reconhece uma rede Wi-Fi pelo nome. Outra rede com o mesmo nome (um "gêmeo maligno") também seria confiável, a menos que você confie nela só por este ponto de acesso. Confie apenas em redes que você controla e prefira "Continuar filtrando" nas públicas.',
+    "Only through this access point": "Só por este ponto de acesso",
+    "Trusted only through access point %1; this is another one, so it is filtered.":
+        "Confiável só pelo ponto de acesso %1; este é outro, então é filtrado.",
+    "(only via %1)": "(só via %1)",
     "Paused on a trusted network (%1)": "Pausado em uma rede confiável (%1)",
     "unnamed": "sem nome",
     "trusted network": "rede confiável",
@@ -470,4 +474,21 @@ T = {
         "Diagnóstico salvo. Ele fica neste computador até você compartilhá-lo.",
     "Save diagnostics": "Salvar diagnóstico",
     "Save diagnostics…": "Salvar diagnóstico…",
+    # Filters → Overlap
+    "Overlap…": "Sobreposição…",
+    "How much the enabled lists duplicate each other": "Quanto as listas ativadas repetem umas às outras",
+    "Filter list overlap": "Sobreposição das listas de filtros",
+    "Comparing the enabled lists…": "Comparando as listas ativadas…",
+    "List": "Lista",
+    "Domains": "Domínios",
+    "Also in another list": "Também em outra lista",
+    "Only in this list": "Só nesta lista",
+    "Shared domains": "Domínios em comum",
+    "Lists that share the most domains:": "Listas com mais domínios em comum:",
+    "Enable at least two lists to compare them.": "Ative pelo menos duas listas para compará-las.",
+    "%1 lists hold %2 entries for %3 different domains: %4 entries (%5%) are duplicates.":
+        "%1 listas têm %2 entradas para %3 domínios diferentes: %4 entradas (%5%) são repetidas.",
+    "Every domain of %1 is also in another list: disabling it alone would unblock nothing.":
+        "Todo domínio de %1 também está em outra lista: desativá-la sozinha não desbloquearia nada.",
+    "Not compared (not downloaded yet): %1": "Não comparadas (ainda não baixadas): %1",
 }

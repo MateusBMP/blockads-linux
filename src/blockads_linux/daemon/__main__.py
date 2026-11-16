@@ -281,7 +281,7 @@ async def serve(args: argparse.Namespace, sockets: list, policy: Policy, state: 
         await forwarder.reset()
         if state is not None:
             state.set_extra_allow(frozenset({network.connectivity_check_host} - {""}))
-            state.set_network(network.primary_uuid)
+            state.set_network(network.primary_uuid, network.primary_bssid)
         log.info("%s: upstream policy reloaded", "resume" if reason == "resume" else "network change")
         _log_upstreams(upstreams)
         health.poke()

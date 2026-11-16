@@ -20,7 +20,8 @@ at once; hand edits are picked up by the poll.
 * Trusted networks: when the primary NetworkManager connection
   (:meth:`StateManager.set_network`) is a trusted network in "pause" mode,
   the policy forwards unfiltered like a pause. "network_dns" mode is the
-  upstream policy's (``PolicyConfig.network_dns_uuids``).
+  upstream policy's (``PolicyConfig.network_dns_uuids``). An entry with a
+  ``bssid`` only matches while the connection goes through that access point.
 """
 
 from __future__ import annotations
@@ -51,7 +52,8 @@ log = logging.getLogger("blockadsd.state")
 
 def upstream_config(texts: list[str] | tuple[str, ...], fallback: list[str] | tuple[str, ...] | None, *,
                     encrypted_only: bool = False, vpn_dns: bool = True,
-                    network_dns_uuids: frozenset[str] = frozenset()) -> PolicyConfig:
+                    network_dns_uuids: frozenset[str] = frozenset(),
+                    network_dns_pins: frozenset[tuple[str, str]] = frozenset()) -> PolicyConfig:
     """PolicyConfig from upstream texts (presets, stamps, URLs); raises ValueError.
 
     ``fallback`` None means the presets' plain DNS plus the network tier;
@@ -79,18 +81,22 @@ def upstream_config(texts: list[str] | tuple[str, ...], fallback: list[str] | tu
         vpn_dns=vpn_dns,
         network_tier=fallback is None,
         network_dns_uuids=network_dns_uuids,
+        network_dns_pins=network_dns_pins,
     )
 
 
 def settings_upstream_config(settings: Settings) -> tuple[PolicyConfig, str]:
     """The settings' upstream config, or the default one and the reason it was refused."""
     dns = settings.dns
-    trusted = frozenset(n.uuid for n in settings.trusted_networks if n.mode == "network_dns")
+    network_dns = [n for n in settings.trusted_networks if n.mode == "network_dns"]
+    trusted = frozenset(n.uuid for n in network_dns)
+    pins = frozenset((n.uuid, n.bssid) for n in network_dns if n.bssid)
     try:
         return upstream_config(dns.upstream, dns.fallback, encrypted_only=dns.encrypted_only,
-                               vpn_dns=dns.vpn_dns, network_dns_uuids=trusted), ""
+                               vpn_dns=dns.vpn_dns, network_dns_uuids=trusted, network_dns_pins=pins), ""
     except ValueError as exc:
-        return (upstream_config([DEFAULT_PRESET], None, vpn_dns=dns.vpn_dns, network_dns_uuids=trusted),
+        return (upstream_config([DEFAULT_PRESET], None, vpn_dns=dns.vpn_dns, network_dns_uuids=trusted,
+                                network_dns_pins=pins),
                 f"dns: {exc}; using {DEFAULT_PRESET}")
 
 
@@ -139,6 +145,7 @@ class StateManager:
         self._requested: tuple[str, ...] = ()
         self._paused_now = False
         self.network_uuid = ""  # the primary NetworkManager connection
+        self.network_bssid = ""  # its access point, when it is Wi-Fi
         self._dirty: set[str] = set()  # callbacks owed: "policy", "upstreams", "settings", "filters"
         self.settings_read_only = False  # written by a newer version
         self.rules_read_only = False
@@ -215,7 +222,8 @@ class StateManager:
         """The trusted-network entry of the current primary connection, if any."""
         if not self.network_uuid:
             return None
-        return next((n for n in self.settings.trusted_networks if n.uuid == self.network_uuid), None)
+        return next((n for n in self.settings.trusted_networks
+                     if n.matches(self.network_uuid, self.network_bssid)), None)
 
     @property
     def protection_state(self) -> str:
@@ -225,11 +233,12 @@ class StateManager:
         trusted = self.trusted
         return "trusted" if trusted is not None and trusted.mode == "pause" else "active"
 
-    def set_network(self, uuid: str) -> None:
-        """The primary connection changed (event loop only)."""
-        if uuid != self.network_uuid:
+    def set_network(self, uuid: str, bssid: str = "") -> None:
+        """The primary connection (or its Wi-Fi access point) changed (event loop only)."""
+        if (uuid, bssid) != (self.network_uuid, self.network_bssid):
             with self._lock:
                 self.network_uuid = uuid
+                self.network_bssid = bssid
                 self._rebuild()
             self.notify()
 
