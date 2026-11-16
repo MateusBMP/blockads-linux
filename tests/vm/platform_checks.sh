@@ -178,9 +178,13 @@ sec_unit() {
     cd - >/dev/null
 }
 
-sec_sni() {
-    local out
-    out=$(python3 -I - <<'EOF' 2>&1
+# The sni checks reach Quad9 over the internet; a hosted CI runner sometimes times
+# out on one request. Each live check gets LIVE_TRIES attempts: a real defect (wrong
+# name accepted, daemon not answering) fails every attempt, a lost packet does not.
+LIVE_TRIES=${LIVE_TRIES:-3}
+
+sni_raw_httpx() {
+    python3 -I - <<'EOF' 2>&1
 import dns.message, httpx, httpcore
 q = dns.message.make_query("example.com", "A").to_wire()
 hdr = {"Host": "dns.quad9.net", "Content-Type": "application/dns-message", "Accept": "application/dns-message"}
@@ -195,15 +199,10 @@ try:
 except Exception as e:
     print("wrong-rejected", type(e).__name__, str(e)[:80])
 EOF
-)
-    info "sni httpx/httpcore" "$(echo "$out" | grep '^versions' | cut -d' ' -f2-)"
-    if echo "$out" | grep -q '^good HTTP/2 200 application/dns-message'; then
-        report PASS "sni_hostname over HTTP/2 to a bootstrap IP" "$(echo "$out" | grep '^good')"
-    else report FAIL "sni_hostname over HTTP/2 to a bootstrap IP" "$(echo "$out" | tr '\n' '|')"; fi
-    # Raw httpx: httpcore < 0.17 ignores sni_hostname (library behaviour, recorded only).
-    info "raw httpx, wrong sni_hostname" "$(echo "$out" | grep '^wrong' | cut -c1-90)"
-    # Our DohUpstream pins the name in its SSL context, so a wrong name must fail on every version.
-    out=$(python3 -I -c '
+}
+
+sni_doh_py() {
+    python3 -I -c '
 import asyncio, sys
 sys.path.insert(0, "'$SRC'/src")
 from blockads_linux.daemon.upstream.doh import DohUpstream
@@ -218,9 +217,30 @@ async def main():
         except UpstreamError as e:
             print(name, "REJECTED", e)
         await u.close()
-asyncio.run(main())' 2>&1)
+asyncio.run(main())' 2>&1
+}
+
+sec_sni() {
+    local out try
+    for ((try = 1; try <= LIVE_TRIES; try++)); do
+        out=$(sni_raw_httpx)
+        echo "$out" | grep -q '^good HTTP/2 200 application/dns-message' && break
+        sleep 3
+    done
+    info "sni httpx/httpcore" "$(echo "$out" | grep '^versions' | cut -d' ' -f2-)"
+    if echo "$out" | grep -q '^good HTTP/2 200 application/dns-message'; then
+        report PASS "sni_hostname over HTTP/2 to a bootstrap IP" "$(echo "$out" | grep '^good') (attempt $try)"
+    else report FAIL "sni_hostname over HTTP/2 to a bootstrap IP" "$(echo "$out" | tr '\n' '|')"; fi
+    # Raw httpx: httpcore < 0.17 ignores sni_hostname (library behaviour, recorded only).
+    info "raw httpx, wrong sni_hostname" "$(echo "$out" | grep '^wrong' | cut -c1-90)"
+    # Our DohUpstream pins the name in its SSL context, so a wrong name must fail on every version.
+    for ((try = 1; try <= LIVE_TRIES; try++)); do
+        out=$(sni_doh_py)
+        echo "$out" | grep -q '^dns.quad9.net ANSWERED' && break
+        sleep 3
+    done
     if echo "$out" | grep -q '^dns.quad9.net ANSWERED' && echo "$out" | grep -q '^wrong.example REJECTED.*certificate'; then
-        report PASS "doh.py: right name answers, wrong name rejected" "$(echo "$out" | tr '\n' '|' | cut -c1-120)"
+        report PASS "doh.py: right name answers, wrong name rejected" "$(echo "$out" | tr '\n' '|' | cut -c1-120) (attempt $try)"
     else report FAIL "doh.py: right name answers, wrong name rejected" "$(echo "$out" | tr '\n' '|' | cut -c1-200)"; fi
 
     # Our own DoH upstream (doh.py) end to end through the dev daemon.
@@ -228,12 +248,16 @@ asyncio.run(main())' 2>&1)
         --upstream 'https://9.9.9.9/dns-query#dns.quad9.net' --fallback none >/run/dev-daemon.log 2>&1 &
     local pid=$!
     sleep 2
-    out=$(python3 -I -c '
+    for ((try = 1; try <= LIVE_TRIES; try++)); do
+        out=$(python3 -I -c '
 import dns.message, dns.query
 r = dns.query.udp(dns.message.make_query("example.com", "A"), "127.0.0.1", port=5300, timeout=5)
 print(dns.rcode.to_text(r.rcode()), len(r.answer))' 2>&1)
+        [[ $out == "NOERROR "[1-9]* ]] && break
+        sleep 3
+    done
     kill $pid; wait $pid 2>/dev/null
-    if [[ $out == "NOERROR "[1-9]* ]]; then report PASS "dev daemon resolves via doh.py (Quad9)" "$out"
+    if [[ $out == "NOERROR "[1-9]* ]]; then report PASS "dev daemon resolves via doh.py (Quad9)" "$out (attempt $try)"
     else report FAIL "dev daemon resolves via doh.py (Quad9)" "$out $(tail -3 /run/dev-daemon.log | tr '\n' '|')"; fi
 }
 
