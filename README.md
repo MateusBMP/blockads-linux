@@ -92,6 +92,21 @@ PYTHONPATH=src python3 -m blockads_linux.daemon --dev --listen 127.0.0.1:5300 \
 Firewall integration tests run only inside throwaway rootless network
 namespaces (`unshare -Urn`); they never touch the host firewall.
 
+## Documentation
+
+The [wiki](https://github.com/MateusBMP/blockads-linux/wiki) covers the
+architecture, installation, usage, configuration, troubleshooting and
+development.
+
+## Security
+
+Please report vulnerabilities privately through
+[GitHub's vulnerability reporting](https://github.com/MateusBMP/blockads-linux/security/advisories/new),
+not in a public issue. [SECURITY.md](SECURITY.md) describes the process, what
+is in scope and the security design (sandboxed unprivileged daemon, a small
+stdlib-only root helper, polkit on every D-Bus call, verified fail-open
+rollback).
+
 ## License
 
 GPL-3.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE) for attribution to
