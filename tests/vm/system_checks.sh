@@ -446,13 +446,14 @@ sec_bridge() {
         bash -c 'systemctl is-active -q blockadsd-bridge.socket && ss -Hlnu | grep -q ":154 "'
     info "bridge: helper state" "$(bridge_state)"
     blockadsctl block $BLOCKED >/dev/null
-    local engines=() r
+    local engines=() pulled=() r
     if docker_ready; then engines+=(docker); else report SKIP "bridge: docker" "docker not installable or not starting"; fi
     { command -v podman >/dev/null || pkg_install podman; } && command -v podman >/dev/null && engines+=(podman)
     [[ ${#engines[@]} -gt 0 ]] || { report SKIP "bridge: containers" "neither docker nor podman installable"; }
     for e in "${engines[@]}"; do
         timeout 240 "$e" pull -q docker.io/library/busybox:1.36 >/dev/null 2>&1 \
             || { report SKIP "bridge: $e" "cannot pull busybox"; continue; }
+        pulled+=("$e")
         "$e" network rm btnet >/dev/null 2>&1; "$e" network create btnet >/dev/null 2>&1
         local net
         for net in bridge btnet; do
@@ -466,7 +467,9 @@ sec_bridge() {
     info "bridge: helper state with containers" "$(bridge_state)"
     local st; st=$(blockadsctl status 2>&1 | grep '^Containers:')
     ok "bridge: blockadsctl status shows the bridge line" "$st" bash -c "[[ '$st' == *'Containers:   filtered ('* ]]"
-    if [[ " ${engines[*]} " == *" docker "* ]]; then
+    # Only with the image present: without it the lookup fails for a reason (registry
+    # unreachable, Docker Hub rate limit) that has nothing to do with the restart.
+    if [[ " ${pulled[*]} " == *" docker "* ]]; then
         systemctl restart docker
         r=$(ctr_lookup docker bridge $BLOCKED)
         ok "bridge: after docker restart -> 0.0.0.0" "$r (jumps $(jumps))" [ "$r" = 0.0.0.0 ]
