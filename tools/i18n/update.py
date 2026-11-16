@@ -3,6 +3,7 @@
 
     python3 tools/i18n/update.py            # all languages
     python3 tools/i18n/update.py --check    # exit 1 when a source has no translation
+    python3 tools/i18n/update.py --compile  # only compile the shipped .ts into .qm (builds, CI)
 
 The .ts files are generated; edit the tables in tools/i18n/ instead.
 """
@@ -30,18 +31,32 @@ def table(lang: str) -> dict[str, str]:
     return module.T
 
 
+# Debian/Ubuntu (qt6-l10n-tools) install the Qt 6 tools outside PATH.
+QT_BIN = "/usr/lib/qt6/bin:/usr/lib64/qt6/bin"
+
+
 def tool(*names: str) -> str:
     for name in names:
-        path = shutil.which(name)
+        path = shutil.which(name) or shutil.which(name, path=QT_BIN)
         if path:
             return path
     sys.exit(f"none of {', '.join(names)} found")
 
 
+def compile_qm(lang: str) -> None:
+    subprocess.run([tool("lrelease6", "lrelease-qt6", "lrelease"), "-silent", str(OUT / f"blockads_{lang}.ts"),
+                    "-qm", str(OUT / f"blockads_{lang}.qm")], check=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--compile", action="store_true", help="only compile the .ts files into .qm")
     args = parser.parse_args()
+    if args.compile:
+        for lang in LANGUAGES:
+            compile_qm(lang)
+        return 0
     sources = sorted(str(p.relative_to(ROOT)) for p in GUI.rglob("*.py"))
     missing_any = False
     for lang in LANGUAGES:
@@ -62,8 +77,7 @@ def main() -> int:
             else:
                 missing.append(source)
         tree.write(ts, encoding="utf-8", xml_declaration=True)
-        subprocess.run([tool("lrelease6", "lrelease-qt6", "lrelease"), "-silent", str(ts), "-qm",
-                        str(OUT / f"blockads_{lang}.qm")], check=True)
+        compile_qm(lang)
         unused = set(translations) - {m.find("source").text or "" for m in tree.iter("message")}
         for source in sorted(set(missing)):
             print(f"{lang}: untranslated: {source!r}")

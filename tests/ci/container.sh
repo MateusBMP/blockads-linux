@@ -27,7 +27,7 @@ install_packages() {
         local pkgs=(python3 python3-dnspython python3-httpx python3-h2 python3-jeepney
                     python3-pytest python3-cryptography dbus passwd util-linux)
         # GUI tests (offscreen; also netns gui_offline): the platform plugins are only a Recommends of libqt6gui6
-        pkgs+=(python3-pyqt6 qt6-qpa-plugins pyqt6-dev-tools)
+        pkgs+=(python3-pyqt6 qt6-qpa-plugins pyqt6-dev-tools qt6-l10n-tools)
         [[ $netns == 1 ]] && pkgs+=(iptables nftables iproute2 uidmap procps)
         apt-get update -qq
         apt-get install -y -qq --no-install-recommends "${pkgs[@]}" >/dev/null
@@ -35,14 +35,14 @@ install_packages() {
     fedora)
         local pkgs=(python3 python3-dns python3-httpx python3-h2 python3-jeepney
                     python3-pytest python3-cryptography dbus-daemon shadow-utils util-linux)
-        pkgs+=(python3-pyqt6)
+        pkgs+=(python3-pyqt6 qt6-linguist)
         [[ $netns == 1 ]] && pkgs+=(iptables-nft iptables-legacy nftables iproute procps-ng)
         dnf install -y -q --setopt=install_weak_deps=False "${pkgs[@]}" >/dev/null
         ;;
     arch)
         local pkgs=(python python-dnspython python-httpx python-h2 python-jeepney
                     python-pytest python-cryptography dbus shadow util-linux)
-        pkgs+=(python-pyqt6)
+        pkgs+=(python-pyqt6 qt6-tools)
         [[ $netns == 1 ]] && pkgs+=(iptables nftables iproute2 procps-ng)
         pacman -Syu --noconfirm --needed --noprogressbar "${pkgs[@]}" >/dev/null
         ;;
@@ -68,10 +68,18 @@ print(f"python {sys.version.split()[0]}, dnspython {dns.version.version}, httpx 
 
 mkdir -p "$RESULTS"
 chmod 0777 "$RESULTS"
+# Written by root and the ci user, read afterwards by the runner's user (upload-artifact).
+trap 'chmod -R a+rX "$RESULTS"' EXIT
+
+# The GUI translations are a build product (not in git): compile the shipped .ts.
+compile_translations() {
+    python3 tools/i18n/update.py --compile
+}
 
 case "$suite" in
 unit)
     install_packages 0
+    compile_translations
     versions | tee "$RESULTS/versions.txt"
     # Unprivileged, like a desktop user (root would bypass permission checks).
     id ci >/dev/null 2>&1 || useradd --create-home --shell /bin/bash ci
@@ -85,6 +93,7 @@ unit)
     ;;
 netns)
     install_packages 1
+    compile_translations
     versions | tee "$RESULTS/versions.txt"
     # `unshare --map-auto` needs a subordinate range for the calling user (root here).
     # First in the file: util-linux 2.39's --map-auto (Ubuntu 24.04) takes the first range,
