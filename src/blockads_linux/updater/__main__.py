@@ -20,6 +20,7 @@ import logging
 import os
 import sys
 
+from ..common.legal import add_version_option
 from ..common.paths import Paths
 from . import manifest as mf
 from .fetch import DaemonResolver, Fetcher
@@ -38,6 +39,7 @@ def _resolver(text: str) -> tuple[str, int]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="blockads-update", description="update blockads-linux filter lists")
+    add_version_option(parser, "blockads-update")
     parser.add_argument("--force", action="store_true", help="update every enabled list now")
     parser.add_argument("--list", action="append", default=[], metavar="ID", help="update only this list (forced)")
     parser.add_argument("--rollback", action="store_true", help="restore the previous generation of lists")

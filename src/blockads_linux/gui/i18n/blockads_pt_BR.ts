@@ -3,42 +3,47 @@
 <context>
     <name>AboutPage</name>
     <message>
-        <location filename="../pages/about.py" line="20" />
+        <location filename="../pages/about.py" line="19" />
         <source>About</source>
         <translation>Sobre</translation>
     </message>
     <message>
-        <location filename="../pages/about.py" line="32" />
+        <location filename="../pages/about.py" line="31" />
         <source>Version %1</source>
         <translation>Versão %1</translation>
     </message>
     <message>
-        <location filename="../pages/about.py" line="33" />
+        <location filename="../pages/about.py" line="32" />
         <source>System-wide DNS filtering of ads, trackers, malware and phishing. A port of BlockAds for Android to the Linux desktop.</source>
         <translation>Filtragem de DNS para todo o sistema contra anúncios, rastreadores, malware e phishing. Uma versão do BlockAds para Android no desktop Linux.</translation>
     </message>
     <message>
-        <location filename="../pages/about.py" line="37" />
+        <location filename="../pages/about.py" line="36" />
         <source>Licence</source>
         <translation>Licença</translation>
     </message>
     <message>
-        <location filename="../pages/about.py" line="38" />
+        <location filename="../pages/about.py" line="37" />
         <source>Free software under the GNU General Public License, version 3. Based on &lt;a href="%1"&gt;blockads-android&lt;/a&gt;; the filter catalog, rule syntax and DoH list are derived from it.</source>
         <translation>Software livre sob a GNU General Public License, versão 3. Baseado no &lt;a href="%1"&gt;blockads-android&lt;/a&gt;; o catálogo de filtros, a sintaxe das regras e a lista de DoH derivam dele.</translation>
     </message>
     <message>
         <location filename="../pages/about.py" line="45" />
+        <source>This program comes with ABSOLUTELY NO WARRANTY, to the extent permitted by law. You may redistribute it under the terms of the GNU General Public License, version 3.</source>
+        <translation>Este programa vem SEM NENHUMA GARANTIA, na extensão permitida pela lei. Você pode redistribuí-lo sob os termos da GNU General Public License, versão 3.</translation>
+    </message>
+    <message>
+        <location filename="../pages/about.py" line="48" />
         <source>Every filter list belongs to its authors and keeps its own licence; the Filters page shows where each one comes from.</source>
         <translation>Cada lista de filtros pertence aos seus autores e mantém sua própria licença; a página Filtros mostra a origem de cada uma.</translation>
     </message>
     <message>
-        <location filename="../pages/about.py" line="49" />
+        <location filename="../pages/about.py" line="52" />
         <source>What this computer contacts</source>
         <translation>O que este computador contata</translation>
     </message>
     <message>
-        <location filename="../pages/about.py" line="50" />
+        <location filename="../pages/about.py" line="53" />
         <source>Only the DNS servers you chose and the addresses of the filter lists you enabled. Nothing else: no telemetry, no accounts, no remote compilation of lists. Your query log and statistics never leave this computer.</source>
         <translation>Somente os servidores DNS que você escolheu e os endereços das listas de filtros que você ativou. Nada mais: sem telemetria, sem contas, sem compilação remota de listas. Seu registro de consultas e suas estatísticas nunca saem deste computador.</translation>
     </message>

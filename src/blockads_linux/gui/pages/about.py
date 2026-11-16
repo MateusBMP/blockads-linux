@@ -6,9 +6,8 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QScrollArea, QVBoxLayout, QWidget
 
 from ... import __version__
+from ...common.legal import COPYRIGHT, UPSTREAM
 from .base import Card, Context, Page, heading, plain
-
-UPSTREAM = "https://github.com/pass-with-high-score/blockads-android"
 
 
 class AboutPage(Page):
@@ -42,6 +41,10 @@ class AboutPage(Page):
         link.setOpenExternalLinks(True)
         link.setWordWrap(True)
         licence.add(link)
+        licence.add(plain(COPYRIGHT.replace("(C)", "\u00a9")))
+        licence.add(plain(self.tr("This program comes with ABSOLUTELY NO WARRANTY, to the extent permitted by law. "
+                                  "You may redistribute it under the terms of the GNU General Public License, "
+                                  "version 3.")))
         licence.add(plain(self.tr("Every filter list belongs to its authors and keeps its own licence; the "
                                   "Filters page shows where each one comes from.")))
         layout.addWidget(licence)

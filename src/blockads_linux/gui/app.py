@@ -18,6 +18,7 @@ from PyQt6.QtDBus import QDBusConnection
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 from PyQt6.QtWidgets import QApplication
 
+from ..common.legal import add_version_option
 from .dbus_client import DaemonClient
 from .main_window import MainWindow
 from .notifications import Notifier
@@ -75,6 +76,7 @@ def install_translators(app: QApplication, language: str) -> list[QTranslator]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="blockads", description="BlockAds desktop GUI")
+    add_version_option(parser, "blockads")
     parser.add_argument("--bus", default="system",
                         help="the daemon's bus: system (default), session or a D-Bus address (development)")
     parser.add_argument("--hidden", action="store_true", help="start in the tray without opening the window")

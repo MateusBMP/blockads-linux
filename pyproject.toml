@@ -7,6 +7,7 @@ name = "blockads-linux"
 description = "System-wide DNS filtering for Linux (ads, trackers, malware) with iptables interception and a Qt6 GUI; a port of blockads-android."
 readme = "README.md"
 license = "GPL-3.0-only"
+authors = [{ name = "MateusBMP" }]
 license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.11"
 dynamic = ["version"]

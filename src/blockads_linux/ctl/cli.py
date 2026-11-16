@@ -27,6 +27,7 @@ from jeepney.io.blocking import open_dbus_connection
 from jeepney.low_level import HeaderFields, MessageFlag
 
 from ..common import android_import, dbus_api, diagnostics
+from ..common.legal import add_version_option
 
 NOT_RUNNING = {"org.freedesktop.DBus.Error.ServiceUnknown", "org.freedesktop.DBus.Error.NameHasNoOwner",
                "org.freedesktop.DBus.Error.NoReply"}
@@ -458,6 +459,7 @@ def open_input(path: str):
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="blockadsctl", description="Control the blockads-linux DNS filter.")
+    add_version_option(parser, "blockadsctl")
     parser.add_argument("--bus", default="system", help="system (default), session, or a bus address")
     parser.add_argument("--no-ask-password", action="store_true", help="never prompt for authentication")
     sub = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")

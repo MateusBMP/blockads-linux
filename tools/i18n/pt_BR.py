@@ -16,6 +16,8 @@ T = {
         'Software livre sob a GNU General Public License, versão 3. Baseado no <a href="%1">blockads-android</a>; o catálogo de filtros, a sintaxe das regras e a lista de DoH derivam dele.',
     "Every filter list belongs to its authors and keeps its own licence; the Filters page shows where each one comes from.":
         "Cada lista de filtros pertence aos seus autores e mantém sua própria licença; a página Filtros mostra a origem de cada uma.",
+    "This program comes with ABSOLUTELY NO WARRANTY, to the extent permitted by law. You may redistribute it under the terms of the GNU General Public License, version 3.":
+        "Este programa vem SEM NENHUMA GARANTIA, na extensão permitida pela lei. Você pode redistribuí-lo sob os termos da GNU General Public License, versão 3.",
     "What this computer contacts": "O que este computador contata",
     "Only the DNS servers you chose and the addresses of the filter lists you enabled. Nothing else: no telemetry, no accounts, no remote compilation of lists. Your query log and statistics never leave this computer.":
         "Somente os servidores DNS que você escolheu e os endereços das listas de filtros que você ativou. Nada mais: sem telemetria, sem contas, sem compilação remota de listas. Seu registro de consultas e suas estatísticas nunca saem deste computador.",

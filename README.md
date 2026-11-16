@@ -109,5 +109,18 @@ rollback).
 
 ## License
 
-GPL-3.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE) for attribution to
-blockads-android.
+Copyright (C) 2026 MateusBMP
+
+blockads-linux is free software under the GNU General Public License,
+version 3 only (`GPL-3.0-only`); see [LICENSE](LICENSE). It comes with
+ABSOLUTELY NO WARRANTY, to the extent permitted by law.
+
+It is a port of, and partly derived from,
+[blockads-android](https://github.com/pass-with-high-score/blockads-android)
+(GPL-3.0). [NOTICE](NOTICE) lists the derived parts and the upstream revision.
+Filter lists are not redistributed: each is downloaded from its original
+publisher and keeps its own licence.
+
+Every program prints its version, copyright and licence with `--version`
+(`blockadsctl`, `blockads`, `blockadsd`, `blockads-update`, `blockads-fw`);
+the GUI shows them on its About page.

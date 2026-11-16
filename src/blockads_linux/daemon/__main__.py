@@ -26,6 +26,7 @@ import tempfile
 import time
 from pathlib import Path
 
+from ..common.legal import add_version_option
 from ..common.paths import Paths
 from ..filters.artifact import ArtifactBuilder, LoadedArtifact
 from ..filters.catalog import load_doh_blocklist
@@ -85,6 +86,7 @@ def _listen_address(text: str) -> tuple[str, int]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="blockadsd", description="blockads-linux DNS filter daemon")
+    add_version_option(parser, "blockadsd")
     dev = parser.add_argument_group("development mode")
     dev.add_argument("--dev", action="store_true", help="bind our own sockets (needs --listen); for tests only")
     dev.add_argument("--listen", action="append", type=_listen_address, default=[], metavar="ADDR:PORT",
