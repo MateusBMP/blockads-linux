@@ -154,6 +154,12 @@ sec_interception() {
     grep -E '^INFO +\[.*S2' "$log" | while read -r line; do info "interception S2" "${line##*  }"; done
     local pass; pass=$(grep -c '^PASS' "$log")
     if [[ $rc -eq 0 ]]; then report PASS "interception.sh" "$pass checks passed"; else report FAIL "interception.sh" "rc=$rc, $pass passed; see $log"; fi
+    if [[ $rc -ne 0 && $pass -eq 0 ]]; then  # it never got going: show why (the log stays on the machine)
+        head -5 "$log" | while IFS= read -r line; do info "interception log" "$line"; done
+        info "interception: /etc/subuid" "$(head -3 /etc/subuid 2>&1 | tr '\n' ' ')"
+        info "interception: unshare" "$(unshare --version 2>&1 | head -1); $(unshare --map-auto --map-root-user --net true 2>&1 && echo map-auto ok)"
+        info "interception: userns sysctls" "$(sysctl -n kernel.apparmor_restrict_unprivileged_userns user.max_user_namespaces 2>&1 | tr '\n' ' ')"
+    fi
     grep -q '^SKIP.*legacy' "$log" && report FAIL "legacy backend exercised" "skipped" || true
 }
 

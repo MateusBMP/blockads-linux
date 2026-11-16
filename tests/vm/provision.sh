@@ -34,9 +34,11 @@ esac
 # Rootless-style harness used by interception.sh: give root a subordinate range,
 # first in the file: util-linux 2.39's --map-auto (Ubuntu 24.04) takes the first
 # range, which on a GitHub runner is the runner user's (as in tests/ci/container.sh).
+# An existing root entry further down is moved to the top.
 for f in /etc/subuid /etc/subgid; do
-    grep -q '^root:' "$f" 2>/dev/null && continue
-    { echo 'root:200000:65536'; cat "$f" 2>/dev/null; } >"$f.new" && mv "$f.new" "$f"
+    head -1 "$f" 2>/dev/null | grep -q '^root:' && continue
+    root=$(grep -m1 '^root:' "$f" 2>/dev/null || echo 'root:200000:65536')
+    { echo "$root"; grep -v '^root:' "$f" 2>/dev/null; } >"$f.new" && mv "$f.new" "$f"
 done
 
 # Legacy xtables modules cannot be auto-loaded from inside a user namespace.

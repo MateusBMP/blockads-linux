@@ -152,7 +152,8 @@ sec_install() {
     ok "install.sh install" "$out" [ "${out%% *}" = installed ]
     ok "sysusers created blockads" "$(id blockads 2>&1)" id blockads
     ok "tmpfiles: /etc/blockads-linux, /run/blockads-fw" "" test -d /etc/blockads-linux -a -d /run/blockads-fw
-    local frag; frag="$(systemctl show -p FragmentPath --value blockadsd.service) $(systemctl show -p FragmentPath --value blockadsd.socket)"
+    # readlink: Debian 12 reports /lib/systemd/system (a symlink to /usr/lib).
+    local frag; frag="$(readlink -f "$(systemctl show -p FragmentPath --value blockadsd.service)") $(readlink -f "$(systemctl show -p FragmentPath --value blockadsd.socket)")"
     ok "the installed units are the ones systemd loads" "$frag" \
         [ "$frag" = "/usr/lib/systemd/system/blockadsd.service /usr/lib/systemd/system/blockadsd.socket" ]
     out=$(systemd-analyze verify --man=no /usr/lib/systemd/system/blockadsd.service /usr/lib/systemd/system/blockads-update.service \
