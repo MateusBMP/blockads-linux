@@ -23,8 +23,8 @@ that uses the same filter catalog and rule syntax, adapted to Linux:
 > policy, list updates, the query log and statistics, the root firewall helper,
 > system integration (systemd units, D-Bus API, polkit), the desktop GUI with
 > its tray icon and notifications, trusted networks and the Android settings
-> import all work. There are no distribution packages yet, so nothing is
-> installable the normal way.
+> import all work. Packages are built from the source tree (Arch, Debian,
+> Ubuntu); there are no published releases or repositories yet.
 
 ## Components
 
@@ -70,6 +70,42 @@ its own packages; the "how" column says where:
 Run the same suites locally: `python -m pytest` (unit),
 `tests/netns/fw_helper.sh` and the other `tests/netns/*.sh` (rootless), and
 `tests/vm/run_platform.sh IMAGE...` (qemu/KVM; the images are listed in `tests/vm/vm.sh`).
+
+## Installation
+
+Packages install everything and enable nothing. After installing, turn
+protection on (and keep it on after a reboot) with:
+
+```sh
+sudo systemctl enable --now blockadsd.service blockads-update.timer blockads-update.path
+```
+
+**Arch Linux / Manjaro**
+
+```sh
+make arch-pkg                     # source tarball of the tree + makepkg
+sudo pacman -U packaging/arch/blockads-linux-*.pkg.tar.zst
+```
+
+**Debian 12/13, Ubuntu 24.04/26.04**
+
+```sh
+cp -r packaging/debian debian
+sudo apt build-dep ./                 # build dependencies from debian/control
+dpkg-buildpackage -us -uc -b
+sudo apt install ../blockads-linux_*_all.deb
+```
+
+**Other distributions (Fedora, ...)**: `make` then `sudo make install`. It
+records every installed path in `/var/lib/blockads-linux-install.manifest`,
+refuses to overwrite files it did not install, rolls back on failure, keeps a
+changed `/etc/blockads-linux/firewall.conf`, and labels the executables for
+SELinux. `sudo make uninstall` stops the service, removes the firewall rules
+and exactly the installed files.
+
+Removing the package (or `make uninstall`) stops the service and removes its
+firewall rules first. Settings and logs in `/var/lib/blockads-linux` are kept,
+except on a Debian purge.
 
 ## Emergency recovery (after installation)
 

@@ -1,0 +1,35 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: blockads-linux
+Upstream-Contact: https://github.com/MateusBMP/blockads-linux/issues
+Source: https://github.com/MateusBMP/blockads-linux
+
+Files: *
+Copyright: 2026 MateusBMP
+License: GPL-3.0-only
+
+Files: src/blockads_linux/filters/parser.py
+       src/blockads_linux/filters/custom_rules.py
+       src/blockads_linux/filters/data/*
+       src/blockads_linux/daemon/pipeline.py
+       src/blockads_linux/daemon/responses.py
+       src/blockads_linux/daemon/safesearch.py
+       src/blockads_linux/daemon/upstream/stamps.py
+       src/blockads_linux/daemon/upstream/presets.py
+Copyright: 2026 MateusBMP
+           the blockads-android authors (https://github.com/pass-with-high-score/blockads-android)
+License: GPL-3.0-only
+Comment: Ported from or generated from blockads-android (GPL-3.0); NOTICE in
+ the source lists the derived parts and the upstream revision.
+
+License: GPL-3.0-only
+ This program is free software: you can redistribute it and/or modify it
+ under the terms of the GNU General Public License, version 3 only, as
+ published by the Free Software Foundation.
+ .
+ This program is distributed in the hope that it will be useful, but WITHOUT
+ ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+ more details.
+ .
+ On Debian systems, the complete text of the GNU General Public License
+ version 3 can be found in "/usr/share/common-licenses/GPL-3".

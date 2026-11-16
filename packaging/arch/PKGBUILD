@@ -1,0 +1,43 @@
+# Maintainer: MateusBMP
+#
+# Packages a source tarball of this checkout (the working tree):
+#
+#   make arch-pkg                      # make dist + makepkg, from the top of the tree
+#   sudo pacman -U packaging/arch/blockads-linux-*.pkg.tar.zst
+#
+# For a release, replace the tarball with the tagged GitHub archive and its
+# checksum. The package installs everything and enables nothing; see the
+# post-install message (blockads-linux.install).
+
+pkgname=blockads-linux
+pkgver=0.1.0.dev0
+pkgrel=1
+pkgdesc="System-wide DNS blocking of ads, trackers, malware and phishing (iptables redirect, Qt6 GUI); a port of blockads-android"
+arch=('any')
+url="https://github.com/MateusBMP/blockads-linux"
+license=('GPL-3.0-only')
+depends=('python>=3.11' 'python-dnspython' 'python-httpx' 'python-h2' 'python-jeepney'
+         'iptables' 'systemd' 'polkit' 'dbus' 'hicolor-icon-theme')
+makedepends=('qt6-tools' 'make')
+optdepends=('python-pyqt6: desktop GUI and tray icon'
+            'qt6-svg: application icon in the GUI'
+            'networkmanager: trusted networks, unmetered-only updates, connectivity state'
+            'python-aioquic: DNS over QUIC and HTTP/3 upstreams')
+backup=('etc/blockads-linux/firewall.conf')
+install=blockads-linux.install
+source=("$pkgname-$pkgver.tar.gz"
+        "90-blockads-linux.hook")
+sha256sums=('SKIP'
+            'SKIP')
+
+build() {
+  cd "$pkgname-$pkgver"
+  make build
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  make install-files DESTDIR="$pkgdir" PYCOMPILE=1 \
+    UNITDIR=/usr/lib/systemd/system SYSUSERSDIR=/usr/lib/sysusers.d TMPFILESDIR=/usr/lib/tmpfiles.d
+  install -Dm644 "$srcdir/90-blockads-linux.hook" "$pkgdir/usr/share/libalpm/hooks/90-blockads-linux.hook"
+}

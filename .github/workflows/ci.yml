@@ -3,6 +3,8 @@
 # Every push and PR (cheap, quick feedback on each distribution's packages):
 #   unit   pytest in distro containers with the distro's own Python and
 #          packages (Debian 12/13, Ubuntu 24.04/26.04, Fedora 44, Arch)
+#   package  build the .deb (Debian 12/13, Ubuntu 24.04/26.04) and the Arch package,
+#          lint them (lintian, namcap), install, run and remove them
 #   netns  the rootless namespace suites (tests/netns: interception, offline_resolver,
 #          storage_enospc, fw_helper, self_healing) in the same containers (privileged), on real
 #          iptables, nft and legacy
@@ -119,6 +121,36 @@ jobs:
         if: always()
         with:
           name: netns-${{ matrix.distro }}
+          path: results/
+          retention-days: 14
+
+  package:
+    name: package (${{ matrix.distro }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { distro: debian12, image: "debian:12" }
+          - { distro: debian13, image: "debian:13" }
+          - { distro: ubuntu2404, image: "ubuntu:24.04" }
+          - { distro: ubuntu2604, image: "ubuntu:26.04" }
+          - { distro: arch, image: "archlinux:latest" }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build, lint, install and remove the package in ${{ matrix.image }}
+        run: |
+          mkdir -p results
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/results:/results" \
+            "${{ matrix.image }}" bash /src/tests/ci/package.sh
+      - name: Report
+        if: always()
+        run: python3 tools/ci/report.py lines results/package.log --title "Package ${{ matrix.distro }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: package-${{ matrix.distro }}
           path: results/
           retention-days: 14
 

@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+
+# Stop and revert the firewall while the helper still exists. Never name
+# blockadsd-ipv6.socket in a stop job (not loadable on an ipv6.disable=1
+# boot); it is PartOf blockadsd.socket.
+if [ "$1" = remove ] || [ "$1" = deconfigure ]; then
+    deb-systemd-helper disable blockadsd.service blockadsd.socket blockadsd-ipv6.socket blockadsd-bridge.socket \
+        blockads-update.timer blockads-update.path >/dev/null 2>&1 || true
+    if [ -d /run/systemd/system ]; then
+        deb-systemd-invoke stop blockadsd.socket blockadsd.service blockads-update.timer blockads-update.path \
+            blockads-update.service >/dev/null 2>&1 || true
+    fi
+    /usr/lib/blockads-linux/blockads-fw revert --all-backends >/dev/null 2>&1 || true
+fi
+
+#DEBHELPER#
+
+exit 0

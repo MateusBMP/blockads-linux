@@ -1,0 +1,45 @@
+Source: blockads-linux
+Section: net
+Priority: optional
+Maintainer: MateusBMP <bmp.mateus@gmail.com>
+Build-Depends: debhelper-compat (= 13),
+               dh-python,
+               python3:any,
+               qt6-l10n-tools,
+               pkgconf,
+               systemd-dev | systemd (<< 253-2~),
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+Homepage: https://github.com/MateusBMP/blockads-linux
+Vcs-Browser: https://github.com/MateusBMP/blockads-linux
+Vcs-Git: https://github.com/MateusBMP/blockads-linux.git
+
+Package: blockads-linux
+Architecture: all
+Depends: ${misc:Depends},
+         ${python3:Depends},
+         python3 (>= 3.11),
+         python3-dnspython (>= 2.3),
+         python3-httpx,
+         python3-h2,
+         python3-jeepney,
+         iptables,
+         systemd,
+         polkitd | policykit-1,
+         dbus,
+Recommends: python3-pyqt6,
+            qt6-qpa-plugins,
+            network-manager,
+            pkexec | policykit-1,
+Suggests: python3-aioquic,
+Description: system-wide DNS blocking of ads, trackers, malware and phishing
+ blockads-linux filters every DNS query of the computer against the filter
+ lists of blockads-android (StevenBlack, EasyPrivacy, URLhaus, ...). A
+ sandboxed local resolver answers on a privileged loopback port; while
+ protection is on, iptables rules redirect outgoing DNS to it. Routing,
+ resolv.conf and NetworkManager are never modified, the rules are never
+ saved, and any failure removes them so DNS keeps working (fail-open).
+ .
+ It includes a Qt6 GUI with a tray icon and the blockadsctl command.
+ Lists are downloaded from their original publishers and compiled locally;
+ there is no telemetry.

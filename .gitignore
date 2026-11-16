@@ -19,3 +19,9 @@ htmlcov/
 
 # Local planning notes and Claude Code state
 /.claude/
+# Packaging build products (make dist, makepkg, dpkg-buildpackage)
+/blockads-linux-*.tar.gz
+/debian/
+/packaging/arch/src/
+/packaging/arch/pkg/
+/packaging/arch/*.pkg.tar.*

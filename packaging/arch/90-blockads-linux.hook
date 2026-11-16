@@ -1,0 +1,19 @@
+# Restart a running blockadsd after it or one of its Python dependencies was
+# upgraded. Runs after pacman's systemd daemon-reload hook (30-*), so the new
+# unit files are in place. The daemon restarts itself after a Python stdlib
+# change, but not after a library upgrade.
+[Trigger]
+Type = Package
+Operation = Upgrade
+Target = blockads-linux
+Target = python
+Target = python-dnspython
+Target = python-httpx
+Target = python-httpcore
+Target = python-h2
+Target = python-jeepney
+
+[Action]
+Description = Restarting blockadsd if it is running...
+When = PostTransaction
+Exec = /bin/sh -c 'systemctl try-restart blockadsd.service 2>/dev/null || true'

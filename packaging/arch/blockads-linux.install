@@ -1,0 +1,37 @@
+# pacman's own hooks create the blockads user (sysusers.d), /etc/blockads-linux
+# and /run/blockads-fw (tmpfiles.d), reload systemd and D-Bus.
+# 90-blockads-linux.hook restarts a running daemon after an upgrade.
+
+post_install() {
+  cat <<'MSG'
+==> blockads-linux is installed but not enabled. To turn protection on
+    (and keep it on after a reboot):
+      sudo systemctl enable --now blockadsd.service blockads-update.timer blockads-update.path
+    Then open BlockAds from the application menu, or run: blockadsctl status
+==> Emergency revert, if DNS ever stops working:
+      sudo /usr/lib/blockads-linux/blockads-fw revert --all-backends
+MSG
+}
+
+pre_remove() {
+  # Stop and revert while the helper still exists. Never name blockadsd-ipv6.socket
+  # in a stop job (not loadable on an ipv6.disable=1 boot); it is PartOf blockadsd.socket.
+  if [ -d /run/systemd/system ]; then
+    systemctl disable blockadsd.service blockadsd.socket blockadsd-ipv6.socket blockadsd-bridge.socket \
+      blockads-update.timer blockads-update.path >/dev/null 2>&1 || true
+    systemctl stop blockadsd.socket blockadsd.service blockads-update.timer blockads-update.path \
+      blockads-update.service >/dev/null 2>&1 || true
+  fi
+  /usr/lib/blockads-linux/blockads-fw revert --all-backends >/dev/null 2>&1 || true
+}
+
+post_remove() {
+  [ -f /run/blockads-fw/emergency.sh ] && sh /run/blockads-fw/emergency.sh >/dev/null 2>&1
+  rm -rf /run/blockads-fw
+  for f in /etc/iptables/iptables.rules /etc/iptables/ip6tables.rules; do
+    if [ -f "$f" ] && grep -q BLOCKADS_ "$f"; then
+      echo "==> warning: $f contains BLOCKADS_ rules saved while protection was on; remove them"
+    fi
+  done
+  echo "==> Settings and logs are kept in /var/lib/blockads-linux (delete it to remove them)."
+}

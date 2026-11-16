@@ -1,0 +1,6 @@
+blockads-linux (0.1.0~dev0) UNRELEASED; urgency=medium
+
+  * First packaging: filter engine, resolver, updater, root firewall helper,
+    systemd units, D-Bus API with polkit, blockadsctl and the Qt6 GUI.
+
+ -- MateusBMP <bmp.mateus@gmail.com>  Mon, 16 Nov 2026 12:00:00 +0000

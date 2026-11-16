@@ -1,0 +1,27 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+remove|purge)
+    if [ -f /run/blockads-fw/emergency.sh ]; then
+        sh /run/blockads-fw/emergency.sh >/dev/null 2>&1 || true
+    fi
+    rm -rf /run/blockads-fw
+    for f in /etc/iptables/rules.v4 /etc/iptables/rules.v6; do
+        if [ -f "$f" ] && grep -q BLOCKADS_ "$f"; then
+            echo "warning: $f contains BLOCKADS_ rules saved while protection was on; remove them" >&2
+        fi
+    done
+    ;;
+esac
+
+if [ "$1" = purge ]; then
+    # Settings, compiled lists, query log and statistics. The blockads system
+    # user is kept, as Debian does for system users.
+    rm -rf /var/lib/blockads-linux
+    rmdir /etc/blockads-linux 2>/dev/null || true
+fi
+
+#DEBHELPER#
+
+exit 0

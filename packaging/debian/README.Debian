@@ -1,0 +1,16 @@
+blockads-linux for Debian and Ubuntu
+====================================
+
+The package installs everything and enables nothing. To turn protection on
+(and keep it on after a reboot):
+
+    sudo systemctl enable --now blockadsd.service blockads-update.timer blockads-update.path
+
+Then open BlockAds from the application menu, or run `blockadsctl status`.
+
+If DNS ever stops working, remove the firewall rules:
+
+    sudo /usr/lib/blockads-linux/blockads-fw revert --all-backends
+
+Removing the package stops the service and removes its rules; purging it also
+deletes the settings, lists and logs in /var/lib/blockads-linux.

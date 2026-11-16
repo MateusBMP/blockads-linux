@@ -1,0 +1,18 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = configure ]; then
+    # The daemon user, /etc/blockads-linux and /run/blockads-fw, before any unit can start.
+    systemd-sysusers blockads-linux.conf
+    systemd-tmpfiles --create blockads-linux.conf || true
+fi
+
+#DEBHELPER#
+
+# An upgrade of a running daemon: restart it with the new code (after the
+# daemon-reload above). Nothing is started on a first install (README.Debian).
+if [ "$1" = configure ] && [ -n "$2" ] && [ -d /run/systemd/system ]; then
+    deb-systemd-invoke try-restart blockadsd.service || true
+fi
+
+exit 0

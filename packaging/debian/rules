@@ -1,0 +1,25 @@
+#!/usr/bin/make -f
+# The package installs everything and enables nothing (README.Debian).
+
+%:
+	dh $@ --with python3
+
+override_dh_auto_build:
+	$(MAKE) build
+
+# The unit tests need D-Bus, network namespaces and PyQt6; CI runs them on
+# every supported distribution instead.
+override_dh_auto_test:
+
+# The Makefile asks pkg-config for the systemd directories (Debian 12:
+# /lib/systemd/system). Licences go to debian/copyright, byte code to dh_python3.
+override_dh_auto_install:
+	$(MAKE) install-files DESTDIR=$(CURDIR)/debian/blockads-linux PYCOMPILE=0 LICENSEDIR=
+
+# Private modules: dh_python3 byte-compiles them at install time and again
+# after a Python upgrade.
+override_dh_python3:
+	dh_python3 /usr/lib/blockads-linux/python
+
+override_dh_installsystemd:
+	dh_installsystemd --no-enable --no-start
