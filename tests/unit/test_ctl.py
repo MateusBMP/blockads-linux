@@ -31,7 +31,6 @@ def test_parse_duration():
             parse_duration(bad)
 
 
-@pytest.mark.skipif(not have_dbus_daemon(), reason="needs dbus-daemon")
 def test_bridge_line():
     base = {"patterns": [], "interfaces": [], "subnets": 0, "allowed": 0, "denied": 0, "dropped": 0}
     assert bridge_line(base) == "not filtered (bridge redirect off)"
@@ -42,6 +41,7 @@ def test_bridge_line():
         "filtered (2 interfaces: br-a, docker0)")
 
 
+@pytest.mark.skipif(not have_dbus_daemon(), reason="needs dbus-daemon")
 def test_blockadsctl_end_to_end(tmp_path):
     paths = setup_state(tmp_path)
 

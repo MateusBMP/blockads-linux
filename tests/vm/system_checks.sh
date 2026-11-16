@@ -152,6 +152,9 @@ sec_install() {
     ok "install.sh install" "$out" [ "${out%% *}" = installed ]
     ok "sysusers created blockads" "$(id blockads 2>&1)" id blockads
     ok "tmpfiles: /etc/blockads-linux, /run/blockads-fw" "" test -d /etc/blockads-linux -a -d /run/blockads-fw
+    local frag; frag="$(systemctl show -p FragmentPath --value blockadsd.service) $(systemctl show -p FragmentPath --value blockadsd.socket)"
+    ok "the installed units are the ones systemd loads" "$frag" \
+        [ "$frag" = "/usr/lib/systemd/system/blockadsd.service /usr/lib/systemd/system/blockadsd.socket" ]
     out=$(systemd-analyze verify --man=no /usr/lib/systemd/system/blockadsd.service /usr/lib/systemd/system/blockads-update.service \
           /usr/lib/systemd/system/blockads-failsafe.service 2>&1)
     # verify also loads the distribution's units it pulls in (Ubuntu 26.04: xfs_scrub's removed
@@ -597,7 +600,9 @@ sec_zones() {
     guest_down btzone; ip link del btbr0 2>/dev/null
     set_bridge '[]'
     [[ $was_active == active ]] || { systemctl stop firewalld; systemctl disable -q firewalld 2>/dev/null; }
-    ok "zones: cleaned up, still applied" "" reapplied
+    # Stopping firewalld right after the restart can cost the redirect; self-healing has 45 s.
+    t=$(wait_for 45 reapplied)
+    ok "zones: cleaned up, still applied" "${t}s, NRestarts $(restarts)" waited "$t"
 }
 
 # --- reboot (driven by run_system.sh: prereboot, reboot, afterboot) ----------------
@@ -1001,7 +1006,9 @@ sec_networks() {
     if [[ $kind == veth ]]; then
         blockadsctl networks add "$uuid" --name bthome --mode pause >/dev/null
         wait_for 10 protection_is trusted >/dev/null
-        nmcli connection down bthome >/dev/null 2>&1
+        # The device, not the connection: NetworkManager may have activated its own
+        # auto-default profile ("Wired connection 1") on bthome0 instead of bthome.
+        nmcli device disconnect bthome0 >/dev/null 2>&1
         t=$(wait_for 15 protection_is active)
         ok "networks: leaving the trusted network -> filtering again" "${t}s" protection_is active
         r=$(q $NOWHERE "$name")

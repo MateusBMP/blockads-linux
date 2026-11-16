@@ -120,7 +120,19 @@ far_up() {  # a "remote" resolver at 192.0.2.1 / 2001:db8::1 in its own netns, t
     FAR_UP=1
 }
 far_down() { [[ -n $FAR_UP ]] || return 0; ip netns pids far | xargs -r kill; ip netns del far; ip link del vfar 2>/dev/null; FAR_UP=""; }
-cleanup() { stop_local_responder; far_down; fw_revert nft; fw_revert legacy; }
+remove_units() {  # the spike units of write_units; in /etc they would shadow the real ones
+    local u had=""
+    for u in blockadsd.service blockadsd.socket blockadsd-ipv6.socket; do
+        [[ -e /etc/systemd/system/$u ]] || continue
+        had=1
+        systemctl stop "$u" 2>/dev/null
+        rm -f "/etc/systemd/system/$u"
+    done
+    [[ -n $had ]] && { systemctl daemon-reload; systemctl reset-failed 2>/dev/null; }
+    return 0
+}
+# On a CI runner tests/vm/system_checks.sh runs next on the same machine.
+cleanup() { stop_local_responder; far_down; fw_revert nft; fw_revert legacy; remove_units; }
 trap cleanup EXIT
 
 # systemd-run with output to a file: --pipe hands the SSH session's pipes to the

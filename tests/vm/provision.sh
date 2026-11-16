@@ -19,7 +19,7 @@ debian|ubuntu)
 fedora)
     dnf install -y -q iptables-nft iptables-legacy nftables conntrack-tools iproute \
         util-linux shadow-utils python3 python3-dns python3-httpx python3-h2 python3-jeepney \
-        python3-pytest python3-cryptography kbd NetworkManager polkit firewalld >/dev/null
+        python3-pytest python3-cryptography dbus-daemon kbd NetworkManager polkit firewalld >/dev/null
     ;;
 arch)
     # --ignore linux: upgrading the kernel package deletes the RUNNING kernel's
@@ -31,9 +31,13 @@ arch)
 *) echo "unsupported distro $ID" >&2; exit 1 ;;
 esac
 
-# Rootless-style harness used by interception.sh: give root a subordinate range.
-grep -q '^root:' /etc/subuid || echo 'root:200000:65536' >>/etc/subuid
-grep -q '^root:' /etc/subgid || echo 'root:200000:65536' >>/etc/subgid
+# Rootless-style harness used by interception.sh: give root a subordinate range,
+# first in the file: util-linux 2.39's --map-auto (Ubuntu 24.04) takes the first
+# range, which on a GitHub runner is the runner user's (as in tests/ci/container.sh).
+for f in /etc/subuid /etc/subgid; do
+    grep -q '^root:' "$f" 2>/dev/null && continue
+    { echo 'root:200000:65536'; cat "$f" 2>/dev/null; } >"$f.new" && mv "$f.new" "$f"
+done
 
 # Legacy xtables modules cannot be auto-loaded from inside a user namespace.
 for m in ip_tables iptable_nat iptable_filter ip6_tables ip6table_nat ip6table_filter; do
