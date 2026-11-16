@@ -18,7 +18,7 @@ run_one() {
     local img=$1 log=$RES/$1.log
     {
         "$VM" up "$img" || return 1
-        tar -C "$ROOT" --exclude=.git --exclude='__pycache__' --exclude='*.part' -cf - src tests tools helper data pyproject.toml \
+        tar -C "$ROOT" --exclude=.git --exclude='__pycache__' --exclude='*.part' -cf - src tests tools helper data pyproject.toml LICENSE NOTICE \
             | "$VM" ssh "$img" 'rm -rf /opt/blockads && mkdir -p /opt/blockads && tar -C /opt/blockads -xf - && chmod -R a+rX /opt/blockads'
         "$VM" ssh "$img" 'bash /opt/blockads/tests/vm/provision.sh' || echo "FAIL provision"
         "$VM" ssh "$img" "bash /opt/blockads/tests/vm/platform_checks.sh $(platform_sections "$img")"

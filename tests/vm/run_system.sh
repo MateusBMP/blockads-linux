@@ -24,7 +24,7 @@ run_one() {
         local fresh=1
         if [[ ${REUSE:-} ]] && "$VM" ssh "$name" 'pkill -f "[m]5_checks.sh"; true' 2>/dev/null; then fresh=""
         else "$VM" up "$img" "$name" || return 1; fi
-        tar -C "$ROOT" --exclude=.git --exclude='__pycache__' --exclude='*.part' -cf - src tests tools helper data pyproject.toml \
+        tar -C "$ROOT" --exclude=.git --exclude='__pycache__' --exclude='*.part' -cf - src tests tools helper data pyproject.toml LICENSE NOTICE \
             | "$VM" ssh "$name" 'rm -rf /opt/blockads && mkdir -p /opt/blockads && tar -C /opt/blockads -xf - && chmod -R a+rX /opt/blockads'
         [[ -z $fresh ]] || "$VM" ssh "$name" 'bash /opt/blockads/tests/vm/provision.sh' || echo "FAIL provision"
         local total=0 i rc

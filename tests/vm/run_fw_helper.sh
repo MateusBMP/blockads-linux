@@ -17,7 +17,7 @@ run_one() {
     local img=$1 log=$RES/fw_helper-$1.log
     {
         "$VM" up "$img" || return 1
-        tar -C "$ROOT" --exclude=.git --exclude='__pycache__' -cf - src tests tools helper pyproject.toml \
+        tar -C "$ROOT" --exclude=.git --exclude='__pycache__' -cf - src tests tools helper pyproject.toml LICENSE NOTICE \
             | "$VM" ssh "$img" 'rm -rf /opt/blockads && mkdir -p /opt/blockads && tar -C /opt/blockads -xf - && chmod -R a+rX /opt/blockads'
         "$VM" ssh "$img" 'bash /opt/blockads/tests/vm/provision.sh' || echo "FAIL provision"
         "$VM" ssh "$img" 'cd /opt/blockads && python3 -m pytest -q -p no:cacheprovider tests/unit/test_fw_helper.py 2>&1 | tail -3'

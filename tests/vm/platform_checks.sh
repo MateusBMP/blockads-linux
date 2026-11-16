@@ -170,7 +170,9 @@ sec_unit() {
     if echo "$last" | grep -q 'passed' && ! echo "$last" | grep -qE 'failed|error'; then
         report PASS "unit tests, distro Python $(python3 -V | cut -d' ' -f2)" "$last"
     else
-        report FAIL "unit tests, distro Python $(python3 -V | cut -d' ' -f2)" "$last"
+        # The failing tests' names in the FAIL line itself: only FAIL lines become CI annotations.
+        local names; names=$(echo "$out" | grep -E '^(FAILED|ERROR) ' | awk '{print $2}' | sed 's|^tests/unit/||' | head -5 | tr '\n' ' ')
+        report FAIL "unit tests, distro Python $(python3 -V | cut -d' ' -f2)" "$last${names:+ -- $names}"
         echo "$out" | grep -E '^(FAILED|ERROR)' | head -20 | while read -r l; do info "unit" "$l"; done
     fi
     cd - >/dev/null
