@@ -1,0 +1,76 @@
+{
+ "call": {},
+ "get_all": {
+  "org.freedesktop.NetworkManager /org/freedesktop/NetworkManager org.freedesktop.NetworkManager": {
+   "ActiveConnections": [
+    "/org/freedesktop/NetworkManager/ActiveConnection/3",
+    "/org/freedesktop/NetworkManager/ActiveConnection/2",
+    "/org/freedesktop/NetworkManager/ActiveConnection/1"
+   ],
+   "Connectivity": 4,
+   "ConnectivityCheckUri": "http://ping.manjaro.org/check_network_status.txt",
+   "Metered": 4,
+   "PrimaryConnection": "/org/freedesktop/NetworkManager/ActiveConnection/3"
+  },
+  "org.freedesktop.NetworkManager /org/freedesktop/NetworkManager/ActiveConnection/1 org.freedesktop.NetworkManager.Connection.Active": {
+   "Default": false,
+   "Default6": false,
+   "Devices": [
+    "/org/freedesktop/NetworkManager/Devices/1"
+   ],
+   "State": 2,
+   "Type": "loopback",
+   "Uuid": "00000000-0000-4000-8000-000000000001",
+   "Vpn": false
+  },
+  "org.freedesktop.NetworkManager /org/freedesktop/NetworkManager/ActiveConnection/2 org.freedesktop.NetworkManager.Connection.Active": {
+   "Default": false,
+   "Default6": false,
+   "Devices": [
+    "/org/freedesktop/NetworkManager/Devices/4"
+   ],
+   "State": 2,
+   "Type": "tun",
+   "Uuid": "00000000-0000-4000-8000-000000000002",
+   "Vpn": false
+  },
+  "org.freedesktop.NetworkManager /org/freedesktop/NetworkManager/ActiveConnection/3 org.freedesktop.NetworkManager.Connection.Active": {
+   "Default": true,
+   "Default6": false,
+   "Devices": [
+    "/org/freedesktop/NetworkManager/Devices/3"
+   ],
+   "State": 2,
+   "Type": "802-11-wireless",
+   "Uuid": "00000000-0000-4000-8000-000000000003",
+   "Vpn": false
+  },
+  "org.freedesktop.NetworkManager /org/freedesktop/NetworkManager/Devices/1 org.freedesktop.NetworkManager.Device": {
+   "Interface": "lo",
+   "IpInterface": "lo"
+  },
+  "org.freedesktop.NetworkManager /org/freedesktop/NetworkManager/Devices/3 org.freedesktop.NetworkManager.Device": {
+   "Interface": "wlp0s20f3",
+   "IpInterface": "wlp0s20f3"
+  },
+  "org.freedesktop.NetworkManager /org/freedesktop/NetworkManager/Devices/4 org.freedesktop.NetworkManager.Device": {
+   "Interface": "outline-tun0",
+   "IpInterface": "outline-tun0"
+  },
+  "org.freedesktop.NetworkManager /org/freedesktop/NetworkManager/DnsManager org.freedesktop.NetworkManager.DnsManager": {
+   "Configuration": [
+    {
+     "interface": "wlp0s20f3",
+     "nameservers": [
+      "192.168.0.1"
+     ],
+     "priority": 100,
+     "vpn": false
+    }
+   ],
+   "Mode": "default",
+   "RcManager": "symlink"
+  }
+ },
+ "if_names": {}
+}

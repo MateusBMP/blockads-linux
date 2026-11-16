@@ -1,0 +1,44 @@
+{
+    "version": 1,
+    "upstreamDns": "192.168.1.53",
+    "fallbackDns": "94.140.14.14",
+    "autoReconnect": true,
+    "themeMode": "dark",
+    "appLanguage": "vi",
+    "dnsResponseType": "nxdomain",
+    "safeSearchEnabled": false,
+    "youtubeRestrictedMode": true,
+    "dailySummaryEnabled": false,
+    "milestoneNotificationsEnabled": true,
+    "filterLists": [
+        {
+            "name": "StevenBlack Unified",
+            "url": "https://cdn.example-mirror.invalid/compiled/stevenblack.zip"
+        },
+        {
+            "name": "EasyPrivacy",
+            "url": "https://easylist.to/easylist/easyprivacy.txt",
+            "isEnabled": false
+        }
+    ],
+    "whitelistDomains": [
+        "Bank.Example.com"
+    ],
+    "blocklistDomains": [
+        "tracker.example.org",
+        "bad..example"
+    ],
+    "whitelistedApps": [
+        "com.example.bank"
+    ],
+    "customRules": [
+        "@@||allowed.example^",
+        "! a comment",
+        "*.sub.example.net"
+    ],
+    "firewallRules": [
+        {
+            "packageName": "com.example.social"
+        }
+    ]
+}

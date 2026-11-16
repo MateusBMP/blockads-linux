@@ -1,0 +1,16 @@
+{
+    "version": 2,
+    "configProfiles": [
+        {
+            "name": "Default",
+            "content": "# BlockAds Unified Configuration Profile\n#\n\n[general]\ndns_exclusion_list = *.local, localhost, *.lan\nauto_reconnect = true\nsafe_search = true\nyoutube_restricted = false\nfirewall_enabled = true\ndaily_summary = true\nmilestone_notifications = true\ntheme = oled\nlanguage = pt-BR\n\n[dns]\nserver = 1.1.1.3\nserver = 1.0.0.3\n\n[policy]\nstatic = DIRECT, direct\nstatic = REJECT, reject\n\n[filter_local]\nhost-suffix, bank.example.com, direct\nhost-suffix, cdn.example.net, direct\nhost-suffix, tracker.example.org, reject\nhost-wildcard, *.ads.example.com, reject\n# host-suffix, disabled.example, reject\nhost-suffix, not a domain!, reject\nip-cidr, 10.0.0.0/8, direct\nip-cidr, 172.16.0.0/12, direct\nip-cidr, 192.168.0.0/16, direct\nfinal, direct\n\n[filter_remote]\nhttps://raw.githubusercontent.com/StevenBlack/hosts/master/hosts, tag=StevenBlack_Unified, update-interval=24\nhttps://easylist.to/easylist/easyprivacy.txt, tag=EasyPrivacy, update-interval=24\nhttps://lists.example.org/my-own-list.txt, tag=My_Own_List, update-interval=24\nhttp://insecure.example.org/list.txt, tag=Insecure, update-interval=24\n# https://disabled.example.org/list.txt, tag=Disabled, update-interval=24\n\n[app_whitelist]\ncom.example.bank\norg.example.game\n\n[firewall]\ncom.example.social, block_wifi=true, block_mobile=true, schedule=22:00-06:00, enabled=true\n",
+            "isActive": true,
+            "isBuiltIn": true
+        },
+        {
+            "name": "Work",
+            "content": "[dns]\nserver = 8.8.8.8\n",
+            "autoUpdate": false
+        }
+    ]
+}

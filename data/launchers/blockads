@@ -1,0 +1,13 @@
+#!/usr/bin/python3 -I
+# blockads: the desktop GUI.
+#
+# Installed as /usr/bin/blockads. -I (isolated mode) ignores PYTHON*
+# variables, the user site directory and the script's directory; our code
+# comes only from the private directory below. PyQt6 is the distribution's.
+import sys
+
+sys.path.insert(0, "/usr/lib/blockads-linux/python")
+
+from blockads_linux.gui.app import main  # noqa: E402
+
+sys.exit(main())

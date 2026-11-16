@@ -1,0 +1,45 @@
+blockads-linux
+Copyright (C) 2026 blockads-linux contributors
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License version 3 as published by the Free
+Software Foundation. See LICENSE.
+
+Derived work notice
+-------------------
+blockads-linux is a Linux port inspired by and partially derived from
+blockads-android (https://github.com/pass-with-high-score/blockads-android),
+licensed under the GNU General Public License v3.0. Derived parts:
+
+  * The filter-list rule parser (src/blockads_linux/filters/parser.py) is a
+    port of tunnel/internal/trie/parser.go and compiler.go.
+  * The custom-rule parser (src/blockads_linux/filters/custom_rules.py) is a
+    port of app/.../utils/CustomRuleParser.kt.
+  * The bundled filter catalog (src/blockads_linux/filters/data/catalog.json)
+    and DNS-over-HTTPS blocklist (data/doh_blocklist.txt) are generated from
+    app/src/fdroid/assets/preset/default_filters.json and
+    app/src/main/assets/blocklist_doh.txt.
+  * The query decision order and blocked answers
+    (src/blockads_linux/daemon/pipeline.py, responses.py) follow
+    tunnel/engine_dns_server.go, engine_standalone.go and engine_dns_query.go
+    (serveDNS, standaloneBlock, isUpstreamBlocked, domainHasAAAA).
+  * SafeSearch / YouTube Restricted matching (daemon/safesearch.py) is a port
+    of tunnel/internal/safesearch/safesearch.go.
+  * DNS stamp handling (daemon/upstream/stamps.py) follows
+    tunnel/internal/dns/stamp.go; the DNS provider presets and their addresses
+    (daemon/upstream/presets.py) come from
+    app/.../data/entities/DnsProvider.kt.
+  * Test vectors in tests/unit/test_pipeline.py and test_stamps.py are ported
+    from tunnel/dns_server_test.go, dns_order_test.go,
+    internal/safesearch/safesearch_test.go and internal/dns/stamp_test.go.
+
+Upstream revision used for the port and parity tests:
+  fc95d66a9443da14729e280c61b496a2bcdda86c
+
+Filter lists
+------------
+blockads-linux does not redistribute any filter list. Lists are downloaded at
+runtime, on the user's machine, directly from their original publishers
+(AdGuard, EasyList, StevenBlack, HaGeZi, abuse.ch URLhaus, malware-filter,
+Dandelion Sprout, uBlock Origin, and others). Each list is subject to its own
+licence; see the About page of the application for per-list attribution.

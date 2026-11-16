@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=BlockAds
+GenericName=DNS ad blocker
+GenericName[pt_BR]=Bloqueador de anúncios por DNS
+Comment=Block ads, trackers, malware and phishing for the whole computer
+Comment[pt_BR]=Bloqueie anúncios, rastreadores, malware e phishing no computador inteiro
+Exec=blockads
+Icon=io.github.mateusbmp.blockads-linux
+Terminal=false
+Categories=System;Security;Qt;
+Keywords=adblock;dns;tracker;privacy;firewall;
+StartupNotify=true
+SingleMainWindow=true

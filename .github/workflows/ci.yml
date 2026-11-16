@@ -1,0 +1,230 @@
+# CI for blockads-linux.
+#
+# Every push and PR (cheap, quick feedback on each distribution's packages):
+#   unit   pytest in distro containers with the distro's own Python and
+#          packages (Debian 12/13, Ubuntu 24.04/26.04, Fedora 44, Arch)
+#   netns  the rootless namespace suites (tests/netns: interception, offline_resolver,
+#          storage_enospc, fw_helper, self_healing) in the same containers (privileged), on real
+#          iptables, nft and legacy
+#
+# Push to main, weekly, or manual dispatch (expensive): the system-integration
+# suite (tests/vm/platform_checks.sh: systemd sandbox, socket activation,
+# NetworkManager, polkit, Docker / firewalld / ufw coexistence) needs a whole
+# machine with its own kernel and systemd:
+#   system  directly on the runner, for targets GitHub provides as runners
+#           (ubuntu-24.04, ubuntu-26.04); the runner is disposable
+#   vm      in qemu/KVM VMs only for targets GitHub does not provide
+#           (Debian 12/13, Fedora 44, Arch), one job per target
+#
+# Reading the results: failures appear as error annotations on the run page and
+# on the PR; each job writes a summary table at the bottom of the run page;
+# every log is uploaded as an artifact (kept 14 days). The runner's own
+# firewall is never touched: the suites run in throwaway namespaces or VMs.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      vm:
+        description: "Run the system-integration suites (runner + qemu VMs)"
+        type: boolean
+        default: true
+  schedule:
+    # Weekly: catches changes in the distributions' packages and cloud images.
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: unit (${{ matrix.distro }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { distro: debian12, image: "debian:12" }
+          - { distro: debian13, image: "debian:13" }
+          - { distro: ubuntu2404, image: "ubuntu:24.04" }
+          - { distro: ubuntu2604, image: "ubuntu:26.04" }
+          - { distro: fedora44, image: "fedora:44" }
+          - { distro: arch, image: "archlinux:latest" }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the unit tests in ${{ matrix.image }}
+        run: |
+          mkdir -p results
+          docker run --rm -v "$PWD:/src" -v "$PWD/results:/results" -w /src \
+            "${{ matrix.image }}" bash tests/ci/container.sh unit
+      - name: Report
+        if: always()
+        run: |
+          [ -f results/versions.txt ] && { echo '```'; cat results/versions.txt; echo '```'; } >>"$GITHUB_STEP_SUMMARY"
+          python3 tools/ci/report.py junit results/unit.xml --title "Unit tests (${{ matrix.distro }})"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-${{ matrix.distro }}
+          path: results/
+          retention-days: 14
+
+  netns:
+    name: netns (${{ matrix.distro }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { distro: debian12, image: "debian:12" }
+          - { distro: debian13, image: "debian:13" }
+          - { distro: ubuntu2404, image: "ubuntu:24.04" }
+          - { distro: ubuntu2604, image: "ubuntu:26.04" }
+          - { distro: fedora44, image: "fedora:44" }
+          - { distro: arch, image: "archlinux:latest" }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Load the legacy xtables modules on the host
+        # They cannot be loaded from inside a container or a user namespace.
+        run: |
+          sudo modprobe -a ip_tables iptable_nat iptable_filter ip6_tables ip6table_nat ip6table_filter
+          lsmod | grep -E '^ip6?table_(nat|filter)' || true
+      - name: Run the namespace suites in ${{ matrix.image }}
+        run: |
+          mkdir -p results
+          docker run --rm --privileged -v "$PWD:/src" -v "$PWD/results:/results" -w /src \
+            "${{ matrix.image }}" bash tests/ci/container.sh netns
+      - name: Report
+        if: always()
+        shell: bash
+        run: |
+          [ -f results/versions.txt ] && { echo '```'; cat results/versions.txt; echo '```'; } >>"$GITHUB_STEP_SUMMARY"
+          rc=0
+          for suite in interception offline_resolver storage_enospc fw_helper self_healing bridge gui_offline; do
+            # Legacy is loaded on the host, so every backend must really run: SKIP fails.
+            python3 tools/ci/report.py lines "results/$suite.log" --no-skip \
+              --title "netns ${{ matrix.distro }}: $suite" || rc=1
+          done
+          exit $rc
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: netns-${{ matrix.distro }}
+          path: results/
+          retention-days: 14
+
+  system:
+    name: system (${{ matrix.image }}, runner)
+    needs: [unit, netns]
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      || github.event_name == 'schedule'
+      || (github.event_name == 'workflow_dispatch' && inputs.vm)
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # GitHub-hosted runner labels (checked 2026-11-15: ubuntu-24.04, and
+          # ubuntu-26.04 GA since 2026-09-17). Pinned labels, never ubuntu-latest.
+          # Add a line when GitHub offers another target, and drop it from the vm job.
+          - { image: ubuntu2404, runner: ubuntu-24.04 }
+          - { image: ubuntu2604, runner: ubuntu-26.04 }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the system-integration suite on the runner
+        run: sudo --preserve-env=CI tests/ci/system.sh ${{ matrix.image }} results/system.log
+      - name: Report
+        if: always()
+        run: python3 tools/ci/report.py lines results/system.log --title "System ${{ matrix.image }} (runner)"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: system-${{ matrix.image }}
+          path: results/
+          retention-days: 14
+
+  vm:
+    name: vm (${{ matrix.image }}, qemu)
+    needs: [unit, netns]
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      || github.event_name == 'schedule'
+      || (github.event_name == 'workflow_dispatch' && inputs.vm)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        # One job per supported target that GitHub has no runner for (checked
+        # 2026-11-15). Ubuntu 24.04 / 26.04 run natively in the system job.
+        image: [debian12, debian13, fedora44, arch]
+    env:
+      BLOCKADS_VM_DIR: ${{ github.workspace }}/.vm
+      VM_MEM: "4096"
+      VM_CPUS: "4"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+      - name: Install qemu
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends qemu-system-x86 qemu-utils openssh-client curl >/dev/null
+          qemu-system-x86_64 --version | head -1
+      - name: Month (image cache key)
+        id: month
+        run: echo "month=$(date +%Y-%m)" >>"$GITHUB_OUTPUT"
+      - name: Cache the cloud image
+        uses: actions/cache@v4
+        with:
+          path: .vm/images/${{ matrix.image }}.qcow2
+          key: vm-image-${{ matrix.image }}-${{ steps.month.outputs.month }}
+          restore-keys: vm-image-${{ matrix.image }}-
+      - name: Download the cloud image
+        run: tests/vm/vm.sh fetch ${{ matrix.image }}
+      - name: Run the platform suite
+        # KEEP=1: the cleanup step below saves the VM's serial console first.
+        run: KEEP=1 tests/vm/run_platform.sh ${{ matrix.image }}
+      - name: Report
+        if: always()
+        run: python3 tools/ci/report.py lines ".vm/results/${{ matrix.image }}.log" --title "VM ${{ matrix.image }}"
+      - name: Stop the platform VM
+        if: always()
+        run: |
+          mkdir -p .vm/results/console
+          cp ".vm/run/${{ matrix.image }}/console.log" ".vm/results/console/${{ matrix.image }}.log" 2>/dev/null || true
+          tests/vm/vm.sh down ${{ matrix.image }} || true
+      - name: Run the system suite (real units under systemd, faults, bridge, reboot)
+        if: always()
+        run: KEEP=1 tests/vm/run_system.sh ${{ matrix.image }}
+      - name: Report system suite
+        if: always()
+        run: python3 tools/ci/report.py lines ".vm/results/${{ matrix.image }}-system.log" --title "VM ${{ matrix.image }} system"
+      - name: Save the system VM console and stop the VM
+        if: always()
+        run: |
+          mkdir -p .vm/results/console
+          cp ".vm/run/${{ matrix.image }}-system/console.log" ".vm/results/console/${{ matrix.image }}-system.log" 2>/dev/null || true
+          tests/vm/vm.sh down ${{ matrix.image }}-system || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vm-${{ matrix.image }}
+          path: .vm/results/
+          retention-days: 14

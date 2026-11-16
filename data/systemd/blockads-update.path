@@ -1,0 +1,9 @@
+[Unit]
+Description=blockads-linux "Update now" requests
+
+[Path]
+PathModified=/var/lib/blockads-linux/update.request
+Unit=blockads-update.service
+
+[Install]
+WantedBy=paths.target

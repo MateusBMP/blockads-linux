@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!-- blockads-linux. The daemon runs as user blockads and
+     checks these for its D-Bus callers; the owner annotation lets it check
+     subjects of other users. Installed to /usr/share/polkit-1/actions/. -->
+<policyconfig>
+  <vendor>blockads-linux</vendor>
+  <vendor_url>https://github.com/mateusbmp/blockads-linux</vendor_url>
+
+  <action id="io.github.mateusbmp.blockads.view">
+    <description>View the DNS filter status, statistics and settings</description>
+    <message>Authentication is required to view the DNS filter status</message>
+    <defaults>
+      <allow_any>yes</allow_any>
+      <allow_inactive>yes</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.owner">unix-user:blockads</annotate>
+  </action>
+
+  <action id="io.github.mateusbmp.blockads.view-logs">
+    <description>View the DNS query log</description>
+    <message>Authentication is required to view the DNS query log</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.owner">unix-user:blockads</annotate>
+  </action>
+
+  <action id="io.github.mateusbmp.blockads.tighten">
+    <description>Make the DNS filter stricter</description>
+    <message>Authentication is required to change the DNS filter</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.owner">unix-user:blockads</annotate>
+  </action>
+
+  <action id="io.github.mateusbmp.blockads.weaken">
+    <description>Pause or weaken the DNS filter</description>
+    <message>Authentication is required to pause or weaken the DNS filter</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.owner">unix-user:blockads</annotate>
+  </action>
+
+  <action id="io.github.mateusbmp.blockads.firewall">
+    <description>Change the DNS filter's firewall options</description>
+    <message>Authentication is required to change the DNS filter's firewall options</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/blockads-linux/blockads-fw</annotate>
+  </action>
+</policyconfig>

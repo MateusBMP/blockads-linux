@@ -1,0 +1,16 @@
+[Unit]
+Description=blockads-linux failsafe: remove every interception rule
+Documentation=man:blockads-fw(8)
+# Started by OnFailure= of blockadsd.service: DNS must never stay redirected
+# to a daemon that is not running (fail-open).
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+# Each step runs even when the one before failed or is missing (`-`), so the
+# copy in /run still cleans up when the installed files are gone. The last
+# step decides the result.
+ExecStart=-/usr/lib/blockads-linux/blockads-fw revert --all-backends
+ExecStart=-/bin/sh /run/blockads-fw/emergency.sh
+ExecStart=/usr/lib/blockads-linux/blockads-fw-emergency.sh
+TimeoutStartSec=2min

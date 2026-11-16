@@ -1,0 +1,17 @@
+*nat
+:BLOCKADS_DNS - [0:0]
+-A BLOCKADS_DNS -d ::1/128 -p udp -m udp --dport 9 -m comment --comment "blockads-linux probe; runtime-only, do not persist" -j REDIRECT --to-ports 153
+-A BLOCKADS_DNS -d ::1/128 -p tcp -m tcp --dport 9 -j REDIRECT --to-ports 153
+-A BLOCKADS_DNS -m owner --uid-owner 977 -j RETURN
+-A BLOCKADS_DNS -m addrtype --dst-type LOCAL -j RETURN
+-A BLOCKADS_DNS -p udp -m udp --dport 53 -j REDIRECT --to-ports 153
+-A BLOCKADS_DNS -p tcp -m tcp --dport 53 -j REDIRECT --to-ports 153
+-I OUTPUT 1 -j BLOCKADS_DNS
+COMMIT
+*filter
+:BLOCKADS_OUT - [0:0]
+-A BLOCKADS_OUT -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN
+-A BLOCKADS_OUT -m owner --uid-owner 977 -j RETURN
+-A BLOCKADS_OUT -m addrtype --dst-type LOCAL -j RETURN
+-I OUTPUT 1 -j BLOCKADS_OUT
+COMMIT

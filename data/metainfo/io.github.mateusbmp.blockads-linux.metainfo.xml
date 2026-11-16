@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.mateusbmp.blockads-linux</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <name>BlockAds</name>
+  <summary>Block ads, trackers, malware and phishing for the whole computer</summary>
+  <summary xml:lang="pt-BR">Bloqueie anúncios, rastreadores, malware e phishing no computador inteiro</summary>
+  <description>
+    <p>
+      BlockAds filters the DNS of the whole computer with the same filter lists as BlockAds for
+      Android. A sandboxed service answers DNS; a small helper redirects port 53 to it with
+      firewall rules and removes them whenever the service stops, so the network keeps working.
+    </p>
+    <p>
+      Nothing leaves the computer except the queries to the DNS servers you chose and the
+      downloads of the filter lists you enabled.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.mateusbmp.blockads-linux.desktop</launchable>
+  <url type="homepage">https://github.com/MateusBMP/blockads-linux</url>
+  <developer id="io.github.mateusbmp">
+    <name>MateusBMP</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+  <provides>
+    <binary>blockads</binary>
+    <binary>blockadsctl</binary>
+  </provides>
+</component>

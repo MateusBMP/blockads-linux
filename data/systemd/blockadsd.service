@@ -1,0 +1,70 @@
+[Unit]
+Description=blockads-linux DNS filter
+Documentation=man:blockadsd(8)
+Requires=blockadsd.socket
+Wants=blockadsd-ipv6.socket nss-lookup.target
+After=blockadsd.socket blockadsd-ipv6.socket blockadsd-bridge.socket firewalld.service ufw.service nftables.service iptables.service netfilter-persistent.service docker.service
+Before=nss-lookup.target
+OnFailure=blockads-failsafe.service
+StartLimitIntervalSec=10min
+StartLimitBurst=6
+
+[Service]
+Type=notify
+User=blockads
+# Root steps (`+`): clear leftovers, then redirect only once the daemon is
+# READY and the commit-confirm probe answers; on stop, un-redirect first.
+ExecStartPre=+/usr/lib/blockads-linux/blockads-fw revert
+ExecStart=/usr/lib/blockads-linux/blockadsd
+ExecStartPost=+/usr/lib/blockads-linux/blockads-fw apply --verify
+ExecStop=-+/usr/lib/blockads-linux/blockads-fw revert
+ExecStopPost=-+/usr/lib/blockads-linux/blockads-fw revert
+# The copy `apply` left in /run (root-only): still there when the installed
+# files were deleted under a running service. Absent before the first apply.
+ExecStopPost=-+/bin/sh /run/blockads-fw/emergency.sh
+# Fails the unit (-> OnFailure) if a jump survived.
+ExecStopPost=+/usr/lib/blockads-linux/blockads-fw-emergency.sh
+Restart=on-failure
+RestartSec=2s
+# RestartSteps=/RestartMaxDelaySec= need systemd >= 254; added by packaging where available.
+# A hung daemon blackholes redirected DNS until this fires (pings every 5 s;
+# VM tests: ~50 s with 60s). The self-check withholds pings on a 5 s loop lag.
+WatchdogSec=15s
+LimitCORE=0
+MemoryMax=512M
+TasksMax=64
+StateDirectory=blockads-linux
+StateDirectoryMode=0700
+CacheDirectory=blockads-linux
+RuntimeDirectory=blockads-linux
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateIPC=yes
+PrivateUsers=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+SocketBindDeny=any
+
+[Install]
+WantedBy=multi-user.target
+Also=blockadsd.socket blockadsd-ipv6.socket

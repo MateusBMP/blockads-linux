@@ -1,0 +1,14 @@
+[Unit]
+Description=blockads-linux DNS socket (IPv4)
+Documentation=man:blockadsd(8)
+
+[Socket]
+# Privileged port, held by PID 1 across daemon restarts.
+# Must match `port=` in /etc/blockads-linux/firewall.conf.
+ListenDatagram=127.0.0.1:153
+ListenStream=127.0.0.1:153
+FileDescriptorName=dns-v4
+Service=blockadsd.service
+
+[Install]
+WantedBy=sockets.target

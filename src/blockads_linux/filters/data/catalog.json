@@ -1,0 +1,1022 @@
+{
+  "schema": 1,
+  "source": {
+    "repository": "https://github.com/pass-with-high-score/blockads-android",
+    "revision": "fc95d66a9443da14729e280c61b496a2bcdda86c",
+    "file": "app/src/fdroid/assets/preset/default_filters.json",
+    "license": "GPL-3.0"
+  },
+  "generated": "2026-11-14",
+  "categories": [
+    "security",
+    "ads",
+    "privacy",
+    "social",
+    "annoyances",
+    "regional",
+    "other"
+  ],
+  "lists": [
+    {
+      "id": "adg_dandelion_sprouts_anti_malware_list",
+      "name": "Dandelion Sprout's Anti-Malware List",
+      "description": "Blocks more malware than most other major anti-malware lists - domains and URL patterns used in malware redirection chains, IP addresses that are solely used by malware, PUP nags, and a few scammers. Already included in Dandelion Sprout's Annoyances List.",
+      "category": "security",
+      "url": "https://raw.githubusercontent.com/DandelionSprout/adfilt/master/Alternate%20versions%20Anti-Malware%20List/AntiMalwareAdGuard.txt",
+      "enabled_by_default": true,
+      "android_default": false,
+      "approx_rules": 11786
+    },
+    {
+      "id": "hagezi_tif",
+      "name": "Hagezi TIF",
+      "description": "Hagezi Threat Intelligence — blocks malware, phishing, scam & cryptojacking",
+      "category": "security",
+      "url": "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/tif.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 2371634
+    },
+    {
+      "id": "adg_online_malicious_url_blocklist",
+      "name": "Online Malicious URL Blocklist",
+      "description": "Blocks domains that are known to be used to propagate malware and spyware.",
+      "category": "security",
+      "url": "https://urlhaus-filter.pages.dev/urlhaus-filter-ag-online.txt",
+      "enabled_by_default": true,
+      "android_default": false,
+      "approx_rules": 487
+    },
+    {
+      "id": "adg_phishing_url_blocklist",
+      "name": "Phishing URL Blocklist",
+      "description": "Phishing URL blocklist for uBlock Origin (uBO), AdGuard, Vivaldi, Pi-hole, Hosts file, Dnsmasq, BIND, Unbound, Snort and Suricata.",
+      "category": "security",
+      "url": "https://malware-filter.gitlab.io/malware-filter/phishing-filter-ag.txt",
+      "enabled_by_default": true,
+      "android_default": false,
+      "approx_rules": 39299
+    },
+    {
+      "id": "phishing_army",
+      "name": "PhishTank Blocklist",
+      "description": "Blocks known phishing websites that steal personal information",
+      "category": "security",
+      "url": "https://phishing.army/download/phishing_army_blocklist.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 147683
+    },
+    {
+      "id": "adg_scam_blocklist_by_durablenapkin",
+      "name": "Scam Blocklist by DurableNapkin",
+      "description": "List for blocking untrustworthy websites.",
+      "category": "security",
+      "url": "https://raw.githubusercontent.com/durablenapkin/scamblocklist/master/adguard.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 966
+    },
+    {
+      "id": "adg_ublock_origin__badware_risks",
+      "name": "uBlock Origin – Badware risks",
+      "description": "Filter for risky sites, warning users of potential threats.",
+      "category": "security",
+      "url": "https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/badware.txt",
+      "enabled_by_default": true,
+      "android_default": false,
+      "approx_rules": 2981
+    },
+    {
+      "id": "urlhaus_malware",
+      "name": "URLhaus Malicious URL Blocklist",
+      "description": "Blocks malware distribution sites — updated frequently by abuse.ch",
+      "category": "security",
+      "url": "https://urlhaus.abuse.ch/downloads/hostfile/",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 386,
+      "retired": "The publisher retired this download (HTTP 410 Gone). Use \"Online Malicious URL Blocklist\" instead."
+    },
+    {
+      "id": "adguard_base",
+      "name": "AdGuard Base Filter",
+      "description": "AdGuard base ad filter — comprehensive alternative to EasyList",
+      "category": "ads",
+      "url": "https://filters.adtidy.org/extension/ublock/filters/2.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 80634
+    },
+    {
+      "id": "adguard_mobile",
+      "name": "AdGuard Mobile Ads",
+      "description": "Optimized filter for mobile ads in apps and mobile websites",
+      "category": "ads",
+      "url": "https://filters.adtidy.org/extension/ublock/filters/11.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 4472
+    },
+    {
+      "id": "adg_adguard_mobile_ads_filter",
+      "name": "AdGuard Mobile Ads filter",
+      "description": "Filter for all known mobile ad networks. Useful for mobile devices.",
+      "category": "ads",
+      "url": "https://filters.adtidy.org/android/filters/11_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 4540
+    },
+    {
+      "id": "easylist",
+      "name": "EasyList",
+      "description": "Most popular global ad filter — blocks ads on most websites",
+      "category": "ads",
+      "url": "https://easylist.to/easylist/easylist.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 55800
+    },
+    {
+      "id": "hagezi_multi",
+      "name": "Hagezi Normal",
+      "description": "Hagezi Normal — all-round protection against ads, tracking & malware",
+      "category": "ads",
+      "url": "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/multi.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 199685
+    },
+    {
+      "id": "hagezi_pro",
+      "name": "Hagezi Pro",
+      "description": "Hagezi Pro — extended protection, recommended for advanced users",
+      "category": "ads",
+      "url": "https://hagezi-mirror.dnsbunker.org/adblock/pro.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 230281
+    },
+    {
+      "id": "stevenblack",
+      "name": "StevenBlack Unified",
+      "description": "Unified hosts from multiple curated sources — ads & malware",
+      "category": "ads",
+      "url": "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
+      "enabled_by_default": true,
+      "android_default": true,
+      "approx_rules": 74745
+    },
+    {
+      "id": "adg_adguard_mail_tracking_protection_filter",
+      "name": "AdGuard Mail Tracking Protection filter",
+      "description": "This filter blocks tracking pixels in email clients.",
+      "category": "privacy",
+      "url": "https://filters.adtidy.org/android/filters/25_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 15
+    },
+    {
+      "id": "adg_adguard_tracking_protection_filter",
+      "name": "AdGuard Tracking Protection filter",
+      "description": "The most comprehensive list of various online counters and web analytics tools. Use this filter if you do not want your actions on the Internet to be tracked.",
+      "category": "privacy",
+      "url": "https://filters.adtidy.org/android/filters/3_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 107357
+    },
+    {
+      "id": "adg_adguard_url_tracking_filter",
+      "name": "AdGuard URL Tracking filter",
+      "description": "Filter that enhances privacy by removing tracking parameters from URLs.",
+      "category": "privacy",
+      "url": "https://filters.adtidy.org/android/filters/17_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 721
+    },
+    {
+      "id": "easyprivacy",
+      "name": "EasyPrivacy",
+      "description": "Blocks tracking scripts and privacy-invasive trackers",
+      "category": "privacy",
+      "url": "https://easylist.to/easylist/easyprivacy.txt",
+      "enabled_by_default": true,
+      "android_default": true,
+      "approx_rules": 47231
+    },
+    {
+      "id": "adg_fanboys_anti_facebook_list",
+      "name": "Fanboy's Anti-Facebook List",
+      "description": "Warning, it will break Facebook-based comments on some websites and may also break some Facebook apps or games.",
+      "category": "privacy",
+      "url": "https://www.fanboy.co.nz/fanboy-antifacebook.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 8
+    },
+    {
+      "id": "adg_legitimate_url_shortener",
+      "name": "Legitimate URL Shortener",
+      "description": "Automatically removes unnecessary '$' and '&' values from URLs, making them easier to copy from the URL bar and pasting elsewhere as links. Already included in Dandelion Sprout's Annoyances List.",
+      "category": "privacy",
+      "url": "https://raw.githubusercontent.com/DandelionSprout/adfilt/master/LegitimateURLShortener.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 377
+    },
+    {
+      "id": "yoyo_adservers",
+      "name": "Peter Lowe's Ad and tracking server list",
+      "description": "Lightweight host-based ad and tracking server blocklist",
+      "category": "privacy",
+      "url": "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&showintro=1&mimetype=plaintext",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 3551
+    },
+    {
+      "id": "adg_peter_lowes_blocklist",
+      "name": "Peter Lowe's Blocklist",
+      "description": "Filter that blocks ads, trackers, and other nasty things.",
+      "category": "privacy",
+      "url": "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&mimetype=plaintext",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 3551
+    },
+    {
+      "id": "adguard_social",
+      "name": "AdGuard Social Media",
+      "description": "Blocks social media widgets — like buttons, share buttons, and embeds",
+      "category": "social",
+      "url": "https://filters.adtidy.org/extension/ublock/filters/4.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 10093
+    },
+    {
+      "id": "adg_adguard_social_media_filter",
+      "name": "AdGuard Social Media filter",
+      "description": "Filter for social media widgets such as 'Like' and 'Share' buttons and more.",
+      "category": "social",
+      "url": "https://filters.adtidy.org/android/filters/4_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 6181
+    },
+    {
+      "id": "adg_fanboys_social_blocking_list",
+      "name": "Fanboy's Social Blocking List",
+      "description": "Hides and blocks social content, social widgets, social scripts and social icons. Already included in Fanboy's Annoyances list.",
+      "category": "social",
+      "url": "https://easylist-downloads.adblockplus.org/fanboy-social.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 3369
+    },
+    {
+      "id": "stevenblack_social",
+      "name": "StevenBlack Social",
+      "description": "Block social media platforms",
+      "category": "social",
+      "url": "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/social-only/hosts",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 3808
+    },
+    {
+      "id": "adg_adblock_warning_removal_list",
+      "name": "Adblock Warning Removal List",
+      "description": "Removes anti-adblock warnings and other obtrusive messages.",
+      "category": "annoyances",
+      "url": "https://easylist-downloads.adblockplus.org/antiadblockfilters.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 2548
+    },
+    {
+      "id": "adg_adguard_annoyances_filter",
+      "name": "AdGuard Annoyances filter",
+      "description": "Blocks irritating elements on web pages including cookie notices, third-party widgets and in-page pop-ups. Contains the following AdGuard filters: Cookie Notices, Popups, Mobile App Banners, Other Annoyances and Widgets.",
+      "category": "annoyances",
+      "url": "https://filters.adtidy.org/android/filters/14_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 14615
+    },
+    {
+      "id": "adg_adguard_cookie_notices_filter",
+      "name": "AdGuard Cookie Notices filter",
+      "description": "Blocks cookie notices on web pages.",
+      "category": "annoyances",
+      "url": "https://filters.adtidy.org/android/filters/18_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 4552
+    },
+    {
+      "id": "adg_adguard_mobile_app_banners_filter",
+      "name": "AdGuard Mobile App Banners filter",
+      "description": "Blocks irritating banners that promote mobile apps of websites.",
+      "category": "annoyances",
+      "url": "https://filters.adtidy.org/android/filters/20_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 1644
+    },
+    {
+      "id": "adg_adguard_other_annoyances_filter",
+      "name": "AdGuard Other Annoyances filter",
+      "description": "Blocks irritating elements on web pages that do not fall under the popular categories of annoyances.",
+      "category": "annoyances",
+      "url": "https://filters.adtidy.org/android/filters/21_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 2081
+    },
+    {
+      "id": "adg_adguard_popups_filter",
+      "name": "AdGuard Popups filter",
+      "description": "Blocks all kinds of pop-ups that are not necessary for websites' operation according to our Filter policy.",
+      "category": "annoyances",
+      "url": "https://filters.adtidy.org/android/filters/19_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 5453
+    },
+    {
+      "id": "adg_adguard_widgets_filter",
+      "name": "AdGuard Widgets filter",
+      "description": "Blocks annoying third-party widgets: online assistants, live support chats, etc.",
+      "category": "annoyances",
+      "url": "https://filters.adtidy.org/android/filters/22_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 898
+    },
+    {
+      "id": "adg_easylist_cookie_list",
+      "name": "EasyList Cookie List",
+      "description": "Removes cookie and privacy warnings. Already included in Fanboy's Annoyances list.",
+      "category": "annoyances",
+      "url": "https://www.fanboy.co.nz/fanboy-cookiemonster.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 7904
+    },
+    {
+      "id": "adg_fanboys_annoyances",
+      "name": "Fanboy's Annoyances",
+      "description": "Removes in-page pop-ups and other annoyances. Includes Fanboy's Social Blocking & EasyList Cookie Lists.",
+      "category": "annoyances",
+      "url": "https://secure.fanboy.co.nz/fanboy-annoyance_ubo.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 19086
+    },
+    {
+      "id": "adg_stevos_ai_blocklist",
+      "name": "Stevo's AI Blocklist",
+      "description": "A filter list that hides website features which use generative AI and AI-generated content.",
+      "category": "annoyances",
+      "url": "https://raw.githubusercontent.com/Stevoisiak/Stevos-AI-Blocklist/refs/heads/main/GenAI-Blocklist.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 721
+    },
+    {
+      "id": "adg_abpindo",
+      "name": "ABPindo",
+      "description": "Additional filter list for websites in Indonesian.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/ABPindo/indonesianadblockrules/master/subscriptions/abpindo.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 3283
+    },
+    {
+      "id": "abpvn",
+      "name": "ABPVN",
+      "description": "Vietnamese ad filter list",
+      "category": "regional",
+      "url": "https://abpvn.com/android/abpvn.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 19158
+    },
+    {
+      "id": "adg_abpvn_list",
+      "name": "ABPVN List",
+      "description": "Vietnamese adblock filter list.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/abpvn/abpvn/master/filter/abpvn_adguard.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 674
+    },
+    {
+      "id": "adg_adblock_list_for_finland",
+      "name": "Adblock List for Finland",
+      "description": "Finnish ad blocking filter list.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/finnish-easylist-addition/finnish-easylist-addition/gh-pages/Finland_adb.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 609
+    },
+    {
+      "id": "adg_adblockid",
+      "name": "AdBlockID",
+      "description": "Additional filter list for websites in Indonesian.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/realodix/AdBlockID/main/dist/adblockid.adfl.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 1345
+    },
+    {
+      "id": "adg_adguard_chinese_filter",
+      "name": "AdGuard Chinese filter",
+      "description": "EasyList China + AdGuard Chinese filter. Filter list that specifically removes ads on websites in Chinese language.",
+      "category": "regional",
+      "url": "https://filters.adtidy.org/android/filters/224_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 11798
+    },
+    {
+      "id": "adg_adguard_dutch_filter",
+      "name": "AdGuard Dutch filter",
+      "description": "EasyList Dutch + AdGuard Dutch filter. Filter list that specifically removes ads on websites in Dutch language.",
+      "category": "regional",
+      "url": "https://filters.adtidy.org/android/filters/8_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 1167
+    },
+    {
+      "id": "adg_adguard_french_filter",
+      "name": "AdGuard French filter",
+      "description": "Liste FR + AdGuard French filter. Filter list that specifically removes ads on websites in French language.",
+      "category": "regional",
+      "url": "https://filters.adtidy.org/android/filters/16_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 2423
+    },
+    {
+      "id": "adg_adguard_german_filter",
+      "name": "AdGuard German filter",
+      "description": "EasyList Germany + AdGuard German filter. Filter list that specifically removes ads on websites in German language.",
+      "category": "regional",
+      "url": "https://filters.adtidy.org/android/filters/6_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 2602
+    },
+    {
+      "id": "adg_adguard_japanese_filter",
+      "name": "AdGuard Japanese filter",
+      "description": "Filter that enables ad blocking on websites in Japanese language.",
+      "category": "regional",
+      "url": "https://filters.adtidy.org/android/filters/7_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 5599
+    },
+    {
+      "id": "adg_adguard_russian_filter",
+      "name": "AdGuard Russian filter",
+      "description": "Filter that enables ad blocking on websites in Russian language.",
+      "category": "regional",
+      "url": "https://filters.adtidy.org/android/filters/1_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 3816
+    },
+    {
+      "id": "adg_adguard_spanish_portuguese_filter",
+      "name": "AdGuard Spanish/Portuguese filter",
+      "description": "Filter list that specifically removes ads on websites in Spanish, Portuguese, and Brazilian Portuguese languages.",
+      "category": "regional",
+      "url": "https://filters.adtidy.org/android/filters/9_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 2710
+    },
+    {
+      "id": "adg_adguard_turkish_filter",
+      "name": "AdGuard Turkish filter",
+      "description": "Filter list that specifically removes ads on websites in Turkish language.",
+      "category": "regional",
+      "url": "https://filters.adtidy.org/android/filters/13_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 2240
+    },
+    {
+      "id": "adg_adguard_ukrainian_filter",
+      "name": "AdGuard Ukrainian filter",
+      "description": "Filter that enables ad blocking on websites in Ukrainian language.",
+      "category": "regional",
+      "url": "https://filters.adtidy.org/android/filters/23_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 2854
+    },
+    {
+      "id": "adg_bulgarian_list",
+      "name": "Bulgarian list",
+      "description": "Additional filter list for websites in Bulgarian.",
+      "category": "regional",
+      "url": "https://stanev.org/abp/adblock_bg.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 404
+    },
+    {
+      "id": "adg_cjxs_annoyances_list",
+      "name": "CJX's Annoyances List",
+      "description": "Supplement for EasyList China+EasyList and EasyPrivacy.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjx-annoyance.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 1151
+    },
+    {
+      "id": "adg_dandelion_sprouts_nordic_filters",
+      "name": "Dandelion Sprout's Nordic Filters",
+      "description": "This list covers websites for Norway, Denmark, Iceland, Danish territories, and the Sami indigenous population.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/DandelionSprout/adfilt/master/NorwegianExperimentalList%20alternate%20versions/NordicFiltersAdGuard.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 1110
+    },
+    {
+      "id": "adg_dandelion_sprouts_serbo_croatian_list",
+      "name": "Dandelion Sprout's Serbo-Croatian List",
+      "description": "A filter list for websites in Serbian, Montenegrin, Croatian, and Bosnian.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/DandelionSprout/adfilt/master/SerboCroatianList.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 269
+    },
+    {
+      "id": "adg_easylist_china",
+      "name": "EasyList China",
+      "description": "Additional filter list for websites in Chinese. Already included in AdGuard Chinese filter.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/easylist/easylistchina/master/easylistchina.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 10665
+    },
+    {
+      "id": "adg_easylist_czech_and_slovak",
+      "name": "EasyList Czech and Slovak",
+      "description": "Additional filter list for websites in Czech and Slovak.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/tomasko126/easylistczechandslovak/master/filters.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 364
+    },
+    {
+      "id": "adg_easylist_dutch",
+      "name": "EasyList Dutch",
+      "description": "Additional filter list for websites in Dutch. Already included in AdGuard Dutch filter.",
+      "category": "regional",
+      "url": "https://easylist-downloads.adblockplus.org/easylistdutch.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 966
+    },
+    {
+      "id": "adg_easylist_germany",
+      "name": "EasyList Germany",
+      "description": "Additional filter list for websites in German. Already included in AdGuard German filter.",
+      "category": "regional",
+      "url": "https://easylist.to/easylistgermany/easylistgermany.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 3123
+    },
+    {
+      "id": "adg_easylist_hebrew",
+      "name": "EasyList Hebrew",
+      "description": "Additional filter list for websites in Hebrew.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/easylist/EasyListHebrew/master/EasyListHebrew.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 781
+    },
+    {
+      "id": "adg_easylist_italy",
+      "name": "EasyList Italy",
+      "description": "Additional filter list for websites in Italian.",
+      "category": "regional",
+      "url": "https://easylist-downloads.adblockplus.org/easylistitaly.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 2479
+    },
+    {
+      "id": "adg_easylist_lithuania",
+      "name": "EasyList Lithuania",
+      "description": "Additional filter list for websites in Lithuanian.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/EasyList-Lithuania/easylist_lithuania/master/easylistlithuania.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 425
+    },
+    {
+      "id": "adg_easylist_polish",
+      "name": "EasyList Polish",
+      "description": "Additional filter list for websites in Polish.",
+      "category": "regional",
+      "url": "https://easylist-downloads.adblockplus.org/easylistpolish.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 1737
+    },
+    {
+      "id": "adg_easylist_portuguese",
+      "name": "EasyList Portuguese",
+      "description": "Additional filter list for websites in Spanish and Portuguese.",
+      "category": "regional",
+      "url": "https://easylist-downloads.adblockplus.org/easylistportuguese.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 1129
+    },
+    {
+      "id": "adg_easylist_spanish",
+      "name": "EasyList Spanish",
+      "description": "Additional filter list for websites in Spanish.",
+      "category": "regional",
+      "url": "https://easylist-downloads.adblockplus.org/easylistspanish.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 1497
+    },
+    {
+      "id": "adg_easylist_thailand",
+      "name": "EasyList Thailand",
+      "description": "Filter that blocks ads on Thai sites.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/easylist-thailand/easylist-thailand/master/subscription/easylist-thailand.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 1028
+    },
+    {
+      "id": "adg_estonian_list",
+      "name": "Estonian List",
+      "description": "Filter for ad blocking on Estonian sites.",
+      "category": "regional",
+      "url": "https://ubo-et.lepik.io/list.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 329
+    },
+    {
+      "id": "adg_frellwits_swedish_filter",
+      "name": "Frellwit's Swedish Filter",
+      "description": "Filter that aims to remove regional Swedish ads, tracking, social media, annoyances, sponsored articles etc.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/lassekongo83/Frellwits-filter-lists/master/Frellwits-Swedish-Filter.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 1034
+    },
+    {
+      "id": "adg_greek_adblock_filter",
+      "name": "Greek AdBlock Filter",
+      "description": "Additional filter list for websites in Greek.",
+      "category": "regional",
+      "url": "https://www.void.gr/kargig/void-gr-filters.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 640
+    },
+    {
+      "id": "hostsvn",
+      "name": "HostsVN",
+      "description": "Vietnamese hosts-based ad blocker",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/bigdargon/hostsVN/master/hosts",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 18438
+    },
+    {
+      "id": "adg_hungarian_filter",
+      "name": "Hungarian filter",
+      "description": "Hufilter. Filter list that specifically removes ads, privacy threats, and security risks on websites in the Hungarian language.",
+      "category": "regional",
+      "url": "https://filters.hufilter.hu/hufilter-adguard.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 1102
+    },
+    {
+      "id": "adg_icelandic_abp_list",
+      "name": "Icelandic ABP List",
+      "description": "Additional filter list for websites in Icelandic.",
+      "category": "regional",
+      "url": "https://adblock.gardar.net/is.abp.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 119
+    },
+    {
+      "id": "adg_indianlist",
+      "name": "IndianList",
+      "description": "Additional filter list for websites in Hindi, Tamil and other Dravidian and Indic languages.",
+      "category": "regional",
+      "url": "https://easylist-downloads.adblockplus.org/indianlist.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 3503
+    },
+    {
+      "id": "adg_kad___anti_scam",
+      "name": "KAD - Anti-Scam",
+      "description": "Filter that protects against various types of scams in the Polish network, such as mass text messaging, fake online stores, etc.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/FiltersHeroes/KAD/master/KAD.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 20660
+    },
+    {
+      "id": "adg_latvian_list",
+      "name": "Latvian List",
+      "description": "Additional filter list for websites in Latvian.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/Latvian-List/adblock-latvian/master/lists/latvian-list.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 235
+    },
+    {
+      "id": "adg_list_kr_classic_filter_list",
+      "name": "List-KR Classic filter list",
+      "description": "The List-KR Сlassic filter list for AdGuard blocks ads and disables anti-adblock scripts on Korean-language websites and apps.",
+      "category": "regional",
+      "url": "https://cdn.jsdelivr.net/npm/@list-kr/filterslists@latest/dist/filterslist-AdGuard-classic.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 1059
+    },
+    {
+      "id": "adg_liste_ar",
+      "name": "Liste AR",
+      "description": "Additional filter list for websites in Arabic.",
+      "category": "regional",
+      "url": "https://easylist-downloads.adblockplus.org/Liste_AR.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 8
+    },
+    {
+      "id": "adg_liste_fr",
+      "name": "Liste FR",
+      "description": "Additional filter list for websites in French. Already included in AdGuard French filter.",
+      "category": "regional",
+      "url": "https://easylist-downloads.adblockplus.org/liste_fr.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 7872
+    },
+    {
+      "id": "adg_macedonian_adblock_filters",
+      "name": "Macedonian adBlock Filters",
+      "description": "Blocks ads and trackers on various Macedonian websites.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/RandomAdversary/Macedonian-adBlock-Filters/master/Filters",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 370
+    },
+    {
+      "id": "adg_official_polish_filters_for_adblock_ublock_origin__adguard",
+      "name": "Official Polish filters for AdBlock, uBlock Origin & AdGuard",
+      "description": "Additional filter list for websites in Polish.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/MajkiIT/polish-ads-filter/master/polish-adblock-filters/adblock.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 2644
+    },
+    {
+      "id": "adg_polish_annoyances_filters",
+      "name": "Polish Annoyances Filters",
+      "description": "Filter list that hides and blocks pop-ups, widgets, newsletters, push notifications, arrows, tagged internal links that are off-topic, and other irritating elements. Polish GDPR-Cookies Filters is already in it.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/PolishFiltersTeam/PolishAnnoyanceFilters/master/PPB.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 7215
+    },
+    {
+      "id": "adg_polish_anti_adblock_filters",
+      "name": "Polish Anti Adblock Filters",
+      "description": "Official Polish filters against Adblock alerts.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/olegwukr/polish-privacy-filters/master/anti-adblock.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 189
+    },
+    {
+      "id": "adg_polish_anti_annoying_special_supplement",
+      "name": "Polish Anti-Annoying Special Supplement",
+      "description": "Filters that block and hide RSS elements and remnants of hidden newsletters combined with social elements on Polish websites.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/FiltersHeroes/PolishAntiAnnoyingSpecialSupplement/master/polish_rss_filters.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 271
+    },
+    {
+      "id": "adg_polish_gdpr_cookies_filters",
+      "name": "Polish GDPR-Cookies Filters",
+      "description": "Polish filter list for cookies blocking.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/MajkiIT/polish-ads-filter/master/cookies_filters/adblock_cookies.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 2638
+    },
+    {
+      "id": "adg_polish_social_filters",
+      "name": "Polish Social Filters",
+      "description": "Polish filter list for social widgets, popups, etc.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/MajkiIT/polish-ads-filter/master/adblock_social_filters/adblock_social_list.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 4835
+    },
+    {
+      "id": "adg_road_block_light",
+      "name": "road-block light",
+      "description": "Romanian ad blocking filter subscription.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/tcptomato/ROad-Block/master/road-block-filters-light.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 942
+    },
+    {
+      "id": "adg_rolist",
+      "name": "ROList",
+      "description": "Additional filter list for websites in Romanian.",
+      "category": "regional",
+      "url": "https://www.zoso.ro/pages/rolist.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 326
+    },
+    {
+      "id": "adg_rolist2",
+      "name": "ROLIST2",
+      "description": "This is a complementary list for ROList with annoyances that are not necessarily banners. It is a very aggressive list and not recommended for beginners.",
+      "category": "regional",
+      "url": "https://www.zoso.ro/pages/rolist2.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 403
+    },
+    {
+      "id": "adg_ru_adlist_counters",
+      "name": "RU AdList: Counters",
+      "description": "RU AdList supplement for trackers blocking.",
+      "category": "regional",
+      "url": "https://easylist-downloads.adblockplus.org/cntblock.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 581
+    },
+    {
+      "id": "adg_xfiles",
+      "name": "Xfiles",
+      "description": "Italian adblock filter list.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/gioxx/xfiles/master/filtri.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 3387
+    },
+    {
+      "id": "adg_xinggsf",
+      "name": "xinggsf",
+      "description": "Blocks ads on the Chinese video platforms (MangoTV, DouYu and others).",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/xinggsf/Adblock-Plus-Rule/master/rule.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 187
+    },
+    {
+      "id": "adg_youslist",
+      "name": "YousList",
+      "description": "Filter that blocks ads on Korean sites.",
+      "category": "regional",
+      "url": "https://raw.githubusercontent.com/yous/YousList/master/youslist.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 4643
+    },
+    {
+      "id": "adg_adguard_dns_filter",
+      "name": "AdGuard DNS filter",
+      "description": "Filter composed of several other filters (AdGuard Base filter, Social Media filter, Tracking Protection filter, Mobile Ads filter, EasyList and EasyPrivacy) and simplified specifically to be better compatible with DNS-level ad blocking.",
+      "category": "other",
+      "url": "https://filters.adtidy.org/android/filters/15_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 175893
+    },
+    {
+      "id": "adg_adguard_experimental_filter",
+      "name": "AdGuard Experimental filter",
+      "description": "Filter designed to test certain hazardous filtering rules before they are added to the basic filters.",
+      "category": "other",
+      "url": "https://filters.adtidy.org/android/filters/5_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 5
+    },
+    {
+      "id": "adg_fanboys_anti_thirdparty_fonts",
+      "name": "Fanboy's Anti-thirdparty Fonts",
+      "description": "A filter that blocks third-party fonts. It may break the look and design of some websites.",
+      "category": "other",
+      "url": "https://fanboy.co.nz/fanboy-antifonts.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 31
+    },
+    {
+      "id": "adg_filter_unblocking_search_ads_and_self_promotion",
+      "name": "Filter unblocking search ads and self-promotion",
+      "description": "Filter that unblocks search ads in Google, DuckDuckGo, Bing, or Yahoo and self-promotion on websites.",
+      "category": "other",
+      "url": "https://filters.adtidy.org/android/filters/10_optimized.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 9
+    },
+    {
+      "id": "hagezi_pro_plus",
+      "name": "Hagezi Pro++",
+      "description": "Hagezi Pro++ — aggressive blocking, may break some apps/sites",
+      "category": "other",
+      "url": "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/pro.plus.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 250825
+    },
+    {
+      "id": "hagezi_ultimate",
+      "name": "Hagezi Ultimate",
+      "description": "Hagezi Ultimate — extremely aggressive blocking, will break most apps/sites",
+      "category": "other",
+      "url": "https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/ultimate.txt",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 286443
+    },
+    {
+      "id": "stevenblack_porn",
+      "name": "StevenBlack Adult",
+      "description": "Block adult content domains",
+      "category": "other",
+      "url": "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/porn-only/hosts",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 76793
+    },
+    {
+      "id": "stevenblack_gambling",
+      "name": "StevenBlack Gambling",
+      "description": "Block gambling & betting sites",
+      "category": "other",
+      "url": "https://raw.githubusercontent.com/StevenBlack/hosts/master/alternates/gambling-only/hosts",
+      "enabled_by_default": false,
+      "android_default": false,
+      "approx_rules": 6673
+    }
+  ]
+}

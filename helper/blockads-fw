@@ -1,0 +1,1439 @@
+#!/usr/bin/python3 -I
+"""blockads-fw: the root helper of blockads-linux.
+
+Applies, verifies and reverts the iptables rules that send local DNS traffic
+to the blockadsd socket, and edits /etc/blockads-linux/firewall.conf.
+
+    blockads-fw apply [--verify]       (ExecStartPost)
+    blockads-fw revert [--all-backends] (ExecStartPre, ExecStop, ExecStopPost, failsafe)
+    blockads-fw status [--json]
+    blockads-fw doctor [--json]
+    blockads-fw set-config             (pkexec; JSON object on stdin)
+
+Rules:
+- stdlib only, one file, no shell: every command is an argv list with a timeout;
+- binaries come from /usr/sbin or /usr/bin, and every component of their real
+  path must be root-owned and not group/world-writable;
+- never read anything the 'blockads' user can write;
+- never persist rules; revert never stops early.
+
+Exit status: 0 success, 1 failure (apply reverted, or something was left
+behind by revert), 2 invalid configuration or usage.
+"""
+
+from __future__ import annotations
+
+import argparse
+import fcntl
+import ipaddress
+import json
+import os
+import pwd
+import re
+import secrets
+import shlex
+import socket
+import stat
+import struct
+import subprocess
+import sys
+import time
+
+# --- constants (tests patch these on the loaded module; there is no CLI or
+# environment override, on purpose) -------------------------------------------
+
+STATE_VERSION = 1
+CONF_PATH = "/etc/blockads-linux/firewall.conf"
+RUN_DIR = "/run/blockads-fw"
+# Installed next to this helper; apply copies it into RUN_DIR (see stash_emergency).
+EMERGENCY_SCRIPT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "blockads-fw-emergency.sh")
+EMERGENCY_COPY = "emergency.sh"
+MAX_EMERGENCY_BYTES = 65536
+BIN_DIRS = ("/usr/sbin", "/usr/bin")
+PROC = "/proc"
+SERVICE_USER = "blockads"
+RESOLVED_USER = "systemd-resolve"
+BRIDGE_SOCKET_UNIT = "blockadsd-bridge.socket"
+SERVICE_UNIT = "blockadsd.service"
+TRUSTED_UIDS = frozenset({0})
+MAX_SYSTEM_UID = 999
+SAVED_RULESETS = (
+    "/etc/iptables/rules.v4",
+    "/etc/iptables/rules.v6",
+    "/etc/iptables/iptables.rules",
+    "/etc/iptables/ip6tables.rules",
+    "/etc/sysconfig/iptables",
+    "/etc/sysconfig/ip6tables",
+)
+
+PROBE_PORT = 9
+PROBE_TRIES = 3
+PROBE_TIMEOUT = 1.0
+PROBE_ZONE = "probe.blockads-linux.invalid"
+PROBE_PREFIX = "blockads-linux:"
+PROBE_COMMENT = "blockads-linux probe; runtime-only, do not persist"
+CMD_TIMEOUT = 10
+RESTORE_TIMEOUT = 20
+BUSCTL_TIMEOUT = 2
+LOCK_TIMEOUT = 30.0
+MAX_CONF_BYTES = 16 * 1024
+MAX_DELETES = 16
+MAX_CIDRS = 64
+MAX_INTERFACES = 32
+
+CLEAN_ENV = {"PATH": "/usr/sbin:/usr/bin", "LC_ALL": "C"}
+
+CHAIN_DNS = "BLOCKADS_DNS"
+CHAIN_OUT = "BLOCKADS_OUT"
+CHAIN_BRIDGE = "BLOCKADS_BRIDGE"
+CHAIN_IN = "BLOCKADS_IN"
+
+# (table, built-in chain, our chain)
+MAIN_HOOKS = (("nat", "OUTPUT", CHAIN_DNS), ("filter", "OUTPUT", CHAIN_OUT))
+BRIDGE_HOOKS = (("nat", "PREROUTING", CHAIN_BRIDGE), ("filter", "INPUT", CHAIN_IN))
+#: Chains used by earlier releases; revert removes them too.
+HISTORICAL_HOOKS: tuple[tuple[str, str, str], ...] = ()
+FAMILIES = ("ipv4", "ipv6")
+TOOL_NAMES = {
+    "ipv4": ("iptables", "iptables-restore"),
+    "ipv6": ("ip6tables", "ip6tables-restore"),
+}
+
+DEFAULT_CONFIG = {
+    "port": 153,
+    "ipv6": "auto",
+    "block_dot": True,
+    "block_webrtc": False,
+    "bypass_cidrs": ["100.100.100.100/32", "fd7a:115c:a1e0::53/128"],
+    "bridge_interfaces": [],
+    "bridge_port": 154,
+}
+#: Keys `set-config` may change; `port` and `bridge_port` are admin-only.
+USER_KEYS = frozenset({"ipv6", "block_dot", "block_webrtc", "bypass_cidrs", "bridge_interfaces"})
+KEY_ORDER = ("port", "ipv6", "block_dot", "block_webrtc", "bypass_cidrs", "bridge_interfaces", "bridge_port")
+
+_IFACE_RE = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,14}\+?|[A-Za-z0-9_]\+")
+
+
+class FwError(Exception):
+    """A failure with an exit status."""
+
+    def __init__(self, message: str, code: int = 1):
+        super().__init__(message)
+        self.code = code
+
+
+def log(message: str) -> None:
+    print(f"blockads-fw: {message}", file=sys.stderr, flush=True)
+
+
+# --- configuration -----------------------------------------------------------
+
+def _parse_bool(key: str, value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value in ("true", "false"):
+        return value == "true"
+    raise FwError(f"{key}: expected true or false", 2)
+
+
+def _parse_port(key: str, value: object) -> int:
+    if isinstance(value, bool):
+        raise FwError(f"{key}: expected a port number", 2)
+    if isinstance(value, str):
+        if not value.isdigit() or len(value) > 5:
+            raise FwError(f"{key}: expected a port number", 2)
+        value = int(value)
+    if not isinstance(value, int) or not 1 <= value <= 1023 or value in (PROBE_PORT, 53):
+        raise FwError(f"{key}: must be a privileged port (1-1023), not 9 or 53", 2)
+    return value
+
+
+def _parse_list(key: str, value: object) -> list[str]:
+    if isinstance(value, str):
+        items = [item.strip() for item in value.split(",")]
+        return [item for item in items if item]
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return [item.strip() for item in value if item.strip()]
+    raise FwError(f"{key}: expected a list of strings", 2)
+
+
+def validate_config(raw: dict) -> dict:
+    """Return a normalised copy of ``raw`` (every key present) or raise FwError(code 2)."""
+    unknown = set(raw) - set(DEFAULT_CONFIG)
+    if unknown:
+        raise FwError(f"unknown key(s): {', '.join(sorted(unknown))}", 2)
+    merged = dict(DEFAULT_CONFIG)
+    merged.update(raw)
+    cfg: dict = {}
+    cfg["port"] = _parse_port("port", merged["port"])
+    cfg["bridge_port"] = _parse_port("bridge_port", merged["bridge_port"])
+    if cfg["bridge_port"] == cfg["port"]:
+        raise FwError("bridge_port must differ from port", 2)
+    if merged["ipv6"] not in ("auto", "off"):
+        raise FwError("ipv6: expected auto or off", 2)
+    cfg["ipv6"] = merged["ipv6"]
+    cfg["block_dot"] = _parse_bool("block_dot", merged["block_dot"])
+    cfg["block_webrtc"] = _parse_bool("block_webrtc", merged["block_webrtc"])
+
+    cidrs: list[str] = []
+    for item in _parse_list("bypass_cidrs", merged["bypass_cidrs"]):
+        try:
+            net = ipaddress.ip_network(item, strict=True)
+        except ValueError as exc:
+            raise FwError(f"bypass_cidrs: {item!r}: {exc}", 2) from None
+        if str(net) not in cidrs:
+            cidrs.append(str(net))
+    if len(cidrs) > MAX_CIDRS:
+        raise FwError(f"bypass_cidrs: at most {MAX_CIDRS} entries", 2)
+    cfg["bypass_cidrs"] = cidrs
+
+    ifaces: list[str] = []
+    for item in _parse_list("bridge_interfaces", merged["bridge_interfaces"]):
+        if len(item) > 15 or not _IFACE_RE.fullmatch(item):
+            raise FwError(f"bridge_interfaces: invalid interface pattern {item!r}", 2)
+        if item in ("lo", "lo+") or item.rstrip("+") == "":
+            raise FwError(f"bridge_interfaces: {item!r} is not allowed", 2)
+        if item not in ifaces:
+            ifaces.append(item)
+    if len(ifaces) > MAX_INTERFACES:
+        raise FwError(f"bridge_interfaces: at most {MAX_INTERFACES} entries", 2)
+    cfg["bridge_interfaces"] = ifaces
+    return cfg
+
+
+def parse_config_text(text: str) -> dict:
+    raw: dict = {}
+    for number, line in enumerate(text.splitlines(), 1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, sep, value = line.partition("=")
+        key, value = key.strip(), value.strip()
+        if not sep or not key:
+            raise FwError(f"{CONF_PATH}:{number}: expected key=value", 2)
+        if key in raw:
+            raise FwError(f"{CONF_PATH}:{number}: duplicate key {key}", 2)
+        raw[key] = value
+    try:
+        return validate_config(raw)
+    except FwError as exc:
+        raise FwError(f"{CONF_PATH}: {exc}", 2) from None
+
+
+def render_config(cfg: dict) -> str:
+    lines = [
+        "# blockads-linux firewall configuration (blockads-fw).",
+        "# Root-owned. port and bridge_port are admin-only and must match the socket units.",
+        "# The GUI changes the other keys with `pkexec blockads-fw set-config`.",
+    ]
+    for key in KEY_ORDER:
+        value = cfg[key]
+        if isinstance(value, bool):
+            text = "true" if value else "false"
+        elif isinstance(value, list):
+            text = ",".join(value)
+        else:
+            text = str(value)
+        lines.append(f"{key}={text}")
+    return "\n".join(lines) + "\n"
+
+
+def check_trusted(path: str) -> None:
+    """Every component of ``path`` (already a real path) is root-owned and not g/o-writable."""
+    parts = path.split("/")
+    current = "/"
+    for part in [""] + parts[1:]:
+        current = os.path.join(current, part) if part else current
+        try:
+            st = os.lstat(current)
+        except OSError as exc:
+            raise FwError(f"untrusted path {path}: {exc.strerror}") from None
+        if stat.S_ISLNK(st.st_mode):
+            raise FwError(f"untrusted path {path}: {current} is a symlink")
+        if st.st_uid not in TRUSTED_UIDS:
+            raise FwError(f"untrusted path {path}: {current} is not owned by root")
+        if st.st_mode & 0o022:
+            raise FwError(f"untrusted path {path}: {current} is group/world-writable")
+
+
+def read_config() -> tuple[dict, list[str]]:
+    """Read firewall.conf strictly. A missing file means the defaults."""
+    directory = os.path.realpath(os.path.dirname(CONF_PATH))
+    path = os.path.join(directory, os.path.basename(CONF_PATH))
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK)
+    except FileNotFoundError:
+        return validate_config({}), [f"{CONF_PATH} is missing; using the defaults"]
+    except OSError as exc:
+        raise FwError(f"cannot open {CONF_PATH}: {exc.strerror}", 2) from None
+    try:
+        check_trusted(directory)
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            raise FwError(f"{CONF_PATH} is not a regular file", 2)
+        if st.st_uid not in TRUSTED_UIDS or st.st_mode & 0o022:
+            raise FwError(f"{CONF_PATH} must be owned by root and not group/world-writable", 2)
+        if st.st_size > MAX_CONF_BYTES:
+            raise FwError(f"{CONF_PATH} is larger than {MAX_CONF_BYTES} bytes", 2)
+        data = os.read(fd, MAX_CONF_BYTES + 1)
+    except FwError as exc:
+        raise FwError(str(exc), 2) from None
+    finally:
+        os.close(fd)
+    if len(data) > MAX_CONF_BYTES:
+        raise FwError(f"{CONF_PATH} is larger than {MAX_CONF_BYTES} bytes", 2)
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        raise FwError(f"{CONF_PATH} is not UTF-8", 2) from None
+    return parse_config_text(text), []
+
+
+def write_file_atomic(path: str, text: str, mode: int) -> None:
+    directory = os.path.dirname(path)
+    tmp = os.path.join(directory, f".{os.path.basename(path)}.{secrets.token_hex(6)}.tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, mode)
+    try:
+        os.fchmod(fd, mode)
+        os.write(fd, text.encode("utf-8"))
+        os.fsync(fd)
+    except BaseException:
+        os.close(fd)
+        os.unlink(tmp)
+        raise
+    os.close(fd)
+    try:
+        os.rename(tmp, path)
+    except BaseException:
+        os.unlink(tmp)
+        raise
+    dfd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    try:
+        os.fsync(dfd)
+    finally:
+        os.close(dfd)
+
+
+# --- commands ----------------------------------------------------------------
+
+def run_cmd(exe: str, argv: list[str], input_text: str | None = None,
+            timeout: float | None = None) -> tuple[int, str, str]:
+    """Run ``exe`` with ``argv`` (argv[0] chosen by us). Never raises.
+
+    Returns (-1, "", reason) on a timeout and (-2, "", reason) when it could not run.
+    """
+    timeout = CMD_TIMEOUT if timeout is None else timeout
+    try:
+        proc = subprocess.run(
+            argv, executable=exe, input=input_text,
+            stdin=None if input_text is not None else subprocess.DEVNULL,
+            capture_output=True, text=True, errors="replace",
+            timeout=timeout, env=CLEAN_ENV, close_fds=True, cwd="/",
+        )
+    except subprocess.TimeoutExpired:
+        return -1, "", f"{argv[0]}: timed out after {timeout:g}s"
+    except OSError as exc:
+        return -2, "", f"{argv[0]}: {exc.strerror or exc}"
+    return proc.returncode, proc.stdout, proc.stderr
+
+
+def find_tool(name: str) -> str | None:
+    """Real path of ``name`` in BIN_DIRS, checked for trust; None when absent."""
+    for directory in BIN_DIRS:
+        candidate = os.path.join(directory, name)
+        if not os.path.lexists(candidate):
+            continue
+        real = os.path.realpath(candidate)
+        check_trusted(real)
+        st = os.stat(real)
+        if not stat.S_ISREG(st.st_mode) or not st.st_mode & 0o111:
+            raise FwError(f"{candidate} is not an executable file")
+        return real
+    return None
+
+
+def backend_of(exe: str) -> str:
+    base = os.path.basename(exe)
+    if "nft" in base:
+        return "nft"
+    if "legacy" in base:
+        return "legacy"
+    rc, out, _ = run_cmd(exe, ["iptables", "-V"])
+    if rc == 0 and "nf_tables" in out:
+        return "nft"
+    if rc == 0 and "legacy" in out:
+        return "legacy"
+    return "legacy"
+
+
+class Backend:
+    """One iptables backend: tool paths per family (None when missing)."""
+
+    def __init__(self, name: str, tools: dict[str, tuple[str, str] | None]):
+        self.name = name
+        self.tools = tools
+
+    def families(self) -> list[str]:
+        return [family for family in FAMILIES if self.tools.get(family)]
+
+    def __repr__(self) -> str:
+        return f"Backend({self.name!r}, {self.tools!r})"
+
+
+def _tools(prefix_v4: str, prefix_v6: str) -> dict[str, tuple[str, str] | None]:
+    tools: dict[str, tuple[str, str] | None] = {}
+    for family, prefix in (("ipv4", prefix_v4), ("ipv6", prefix_v6)):
+        ipt = find_tool(prefix)
+        restore = find_tool(f"{prefix}-restore")
+        tools[family] = (ipt, restore) if ipt and restore else None
+    return tools
+
+
+def current_backend() -> Backend | None:
+    tools = _tools("iptables", "ip6tables")
+    if not tools["ipv4"]:
+        return None
+    return Backend(backend_of(tools["ipv4"][0]), tools)
+
+
+def all_backends(include: Backend | None = None) -> list[Backend]:
+    found: dict[str, Backend] = {}
+    if include is not None:
+        found[include.name] = include
+    for name in ("nft", "legacy"):
+        if name in found:
+            continue
+        tools = _tools(f"iptables-{name}", f"ip6tables-{name}")
+        if tools["ipv4"] or tools["ipv6"]:
+            found[name] = Backend(name, tools)
+    return list(found.values())
+
+
+def legacy_tables_loaded(family: str) -> bool:
+    """Legacy rules can exist only if the x_tables module lists a table.
+
+    Checking first avoids loading legacy kernel modules on nft systems.
+    """
+    name = "ip_tables_names" if family == "ipv4" else "ip6_tables_names"
+    try:
+        with open(os.path.join(PROC, "net", name), encoding="ascii") as handle:
+            return bool(handle.read().strip())
+    except OSError:
+        return False
+
+
+class Tables:
+    """iptables operations for one backend and family."""
+
+    def __init__(self, backend: Backend, family: str):
+        tools = backend.tools[family]
+        if not tools:
+            raise FwError(f"{backend.name}: no {family} tools")
+        self.backend = backend
+        self.family = family
+        self.ipt, self.restore_exe = tools
+        self.ipt_name, self.restore_name = TOOL_NAMES[family]
+
+    def run(self, *args: str, timeout: float | None = None) -> tuple[int, str, str]:
+        return run_cmd(self.ipt, [self.ipt_name, "-w", "5", *args], timeout=timeout)
+
+    def restore(self, text: str) -> tuple[int, str, str]:
+        return run_cmd(self.restore_exe, [self.restore_name, "-w", "10", "--noflush"],
+                       input_text=text, timeout=RESTORE_TIMEOUT)
+
+    def list_chain(self, table: str, chain: str) -> tuple[str, list[str]]:
+        """("ok", lines) | ("absent", []) | ("unknown", [reason])."""
+        rc, out, err = self.run("-t", table, "-S", chain)
+        if rc == 0:
+            return "ok", out.splitlines()
+        if rc >= 0 and _is_absent(err):
+            return "absent", []
+        return "unknown", [(err or out).strip().splitlines()[0] if (err or out).strip() else f"rc={rc}"]
+
+    def check(self, table: str, chain: str, rule: list[str]) -> bool:
+        return self.run("-t", table, "-C", chain, *rule)[0] == 0
+
+
+def _is_absent(err: str) -> bool:
+    return any(marker in err for marker in (
+        "No chain/target/match by that name",
+        "does not exist",
+        "Table does not exist",
+        "can't initialize",
+        "not supported",
+    ))
+
+
+def jump_lines(lines: list[str], builtin: str, chain: str) -> list[str]:
+    """Rules in ``builtin`` (``-S`` output) that jump or go to ``chain``."""
+    prefix = f"-A {builtin} "
+    found = []
+    for line in lines:
+        if not line.startswith(prefix):
+            continue
+        tokens = line.split()
+        for i, token in enumerate(tokens[:-1]):
+            if token in ("-j", "-g", "--jump", "--goto") and tokens[i + 1] == chain:
+                found.append(line)
+                break
+    return found
+
+
+def exact_jumps(lines: list[str], builtin: str, chain: str) -> int:
+    return sum(1 for line in lines if line == f"-A {builtin} -j {chain}")
+
+
+# --- rendering ---------------------------------------------------------------
+
+def _quote(token: str) -> str:
+    if token and not any(ch in token for ch in ' "\'\\\t'):
+        return token
+    return '"' + token.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _family_of(cidr: str) -> str:
+    return "ipv6" if ":" in cidr else "ipv4"
+
+
+def render_rules(family: str, chain: str, cfg: dict, service_uid: int,
+                 resolved_uid: int | None = None) -> list[list[str]]:
+    """The rules of one of our chains, as argv token lists (also used for ``-C``)."""
+    v6 = family == "ipv6"
+    loopback = "::1/128" if v6 else "127.0.0.1/32"
+    unreachable = "icmp6-port-unreachable" if v6 else "icmp-port-unreachable"
+    port = str(cfg["port"])
+    bport = str(cfg["bridge_port"])
+    bypass = [["-d", cidr, "-j", "RETURN"] for cidr in cfg["bypass_cidrs"] if _family_of(cidr) == family]
+    local = ["-m", "addrtype", "--dst-type", "LOCAL", "-j", "RETURN"]
+    owner = ["-m", "owner", "--uid-owner", str(service_uid), "-j", "RETURN"]
+
+    if chain == CHAIN_DNS:
+        return [
+            ["-d", loopback, "-p", "udp", "-m", "udp", "--dport", str(PROBE_PORT),
+             "-m", "comment", "--comment", PROBE_COMMENT, "-j", "REDIRECT", "--to-ports", port],
+            ["-d", loopback, "-p", "tcp", "-m", "tcp", "--dport", str(PROBE_PORT), "-j", "REDIRECT", "--to-ports", port],
+            owner,
+            local,
+            *bypass,
+            ["-p", "udp", "-m", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", port],
+            ["-p", "tcp", "-m", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", port],
+        ]
+    if chain == CHAIN_OUT:
+        rules = [
+            ["-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "RETURN"],
+            owner,
+        ]
+        if resolved_uid is not None:
+            rules.append(["-m", "owner", "--uid-owner", str(resolved_uid), "-j", "RETURN"])
+        rules.append(local)
+        if cfg["block_dot"]:
+            rules += [
+                ["-p", "tcp", "-m", "tcp", "--dport", "853", "-j", "REJECT", "--reject-with", "tcp-reset"],
+                ["-p", "udp", "-m", "udp", "--dport", "853", "-j", "REJECT", "--reject-with", unreachable],
+            ]
+        if cfg["block_webrtc"]:
+            rules += [
+                ["-p", "udp", "-m", "multiport", "--dports", "3478,5349,19302:19309",
+                 "-j", "REJECT", "--reject-with", unreachable],
+                ["-p", "tcp", "-m", "multiport", "--dports", "3478,5349",
+                 "-j", "REJECT", "--reject-with", "tcp-reset"],
+            ]
+        return rules
+    if chain == CHAIN_BRIDGE:
+        rules = [local, *bypass]
+        for iface in cfg["bridge_interfaces"]:
+            rules += [
+                ["-i", iface, "-p", "udp", "-m", "udp", "--dport", "53", "-j", "REDIRECT", "--to-ports", bport],
+                ["-i", iface, "-p", "tcp", "-m", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-ports", bport],
+            ]
+        return rules
+    if chain == CHAIN_IN:
+        return [
+            ["-p", "udp", "-m", "udp", "--dport", bport, "-m", "conntrack", "--ctstate", "DNAT", "-j", "RETURN"],
+            ["-p", "tcp", "-m", "tcp", "--dport", bport, "-m", "conntrack", "--ctstate", "DNAT", "-j", "RETURN"],
+            ["-p", "udp", "-m", "udp", "--dport", bport, "-j", "DROP"],
+            ["-p", "tcp", "-m", "tcp", "--dport", bport, "-j", "REJECT", "--reject-with", "tcp-reset"],
+        ]
+    raise ValueError(chain)
+
+
+def render_transaction(table: str, builtin: str, chain: str, rules: list[list[str]], jumps: int) -> str:
+    """One ``iptables-restore --noflush`` input for one table and chain.
+
+    Re-declaring the chain flushes and refills it atomically (tests/netns/interception.sh, S1). The
+    jump is inserted only when none exists; extra exact jumps are deleted.
+    """
+    lines = [f"*{table}", f":{chain} - [0:0]"]
+    lines += [" ".join([f"-A {chain}"] + [_quote(token) for token in rule]) for rule in rules]
+    if jumps == 0:
+        lines.append(f"-I {builtin} 1 -j {chain}")
+    lines += [f"-D {builtin} -j {chain}"] * max(0, jumps - 1)
+    lines.append("COMMIT")
+    return "\n".join(lines) + "\n"
+
+
+# --- /proc readers -----------------------------------------------------------
+
+def _proc_addr(hexaddr: str) -> str:
+    raw = bytes.fromhex(hexaddr)
+    words = b"".join(struct.pack("=I", struct.unpack(">I", raw[i:i + 4])[0]) for i in range(0, len(raw), 4))
+    return str(ipaddress.ip_address(words))
+
+
+def listeners(proto: str, family: str) -> set[tuple[str, int]]:
+    """Bound UDP / listening TCP sockets as (address, port), from /proc/net."""
+    name = proto + ("6" if family == "ipv6" else "")
+    result: set[tuple[str, int]] = set()
+    try:
+        with open(os.path.join(PROC, "net", name), encoding="ascii") as handle:
+            next(handle, None)
+            for line in handle:
+                fields = line.split()
+                if len(fields) < 4:
+                    continue
+                if proto == "tcp" and fields[3] != "0A":
+                    continue
+                addr, _, port = fields[1].partition(":")
+                try:
+                    result.add((_proc_addr(addr), int(port, 16)))
+                except ValueError:
+                    continue
+    except OSError:
+        pass
+    return result
+
+
+def has_listener(family: str, port: int, *, any_address: bool = False) -> bool:
+    wanted = {"::1", "::"} if family == "ipv6" else {"127.0.0.1", "0.0.0.0"}
+    for proto in ("udp", "tcp"):
+        found = listeners(proto, family)
+        if not any(p == port and (any_address or addr in wanted) for addr, p in found):
+            return False
+    return True
+
+
+def unprivileged_port_start() -> int:
+    try:
+        with open(os.path.join(PROC, "sys/net/ipv4/ip_unprivileged_port_start"), encoding="ascii") as handle:
+            return int(handle.read().strip())
+    except (OSError, ValueError):
+        return 1024
+
+
+def ipv6_addresses() -> list[tuple[str, str]] | None:
+    """(address, interface) pairs from /proc/net/if_inet6; None if IPv6 is off in the kernel."""
+    try:
+        with open(os.path.join(PROC, "net", "if_inet6"), encoding="ascii") as handle:
+            rows = [line.split() for line in handle]
+    except OSError:
+        return None
+    result = []
+    for fields in rows:
+        if len(fields) >= 6:
+            try:
+                result.append((str(ipaddress.ip_address(bytes.fromhex(fields[0]))), fields[5]))
+            except ValueError:
+                continue
+    return result
+
+
+def service_uid() -> int:
+    try:
+        entry = pwd.getpwnam(SERVICE_USER)
+    except KeyError:
+        raise FwError(f"user {SERVICE_USER!r} does not exist") from None
+    if not 0 < entry.pw_uid <= MAX_SYSTEM_UID:
+        raise FwError(f"user {SERVICE_USER!r} must be a system user (uid {entry.pw_uid})")
+    return entry.pw_uid
+
+
+def resolved_dot_mode() -> str:
+    """systemd-resolved's global DNSOverTLS: yes/opportunistic/no, 'absent', or 'unknown'."""
+    try:
+        pwd.getpwnam(RESOLVED_USER)
+    except KeyError:
+        return "absent"
+    busctl = find_tool("busctl")
+    if not busctl:
+        return "unknown"
+    rc, out, err = run_cmd(busctl, [
+        "busctl", "--system", "--json=short", "get-property",
+        "org.freedesktop.resolve1", "/org/freedesktop/resolve1",
+        "org.freedesktop.resolve1.Manager", "DNSOverTLS",
+    ], timeout=BUSCTL_TIMEOUT)
+    if rc == 0:
+        try:
+            value = json.loads(out).get("data")
+        except (ValueError, AttributeError):
+            return "unknown"
+        return value if value in ("yes", "opportunistic", "no") else "unknown"
+    if rc > 0 and any(marker in err for marker in (
+            "was not provided by any .service", "ServiceUnknown", "not activatable",
+            "Failed to connect to bus", "No such file or directory")):
+        return "absent"
+    return "unknown"
+
+
+# --- probe -------------------------------------------------------------------
+
+def build_probe_query(qid: int, nonce: str) -> bytes:
+    labels = [nonce, *PROBE_ZONE.split(".")]
+    qname = b"".join(bytes([len(label)]) + label.encode("ascii") for label in labels) + b"\0"
+    return struct.pack("!HHHHHH", qid, 0x0100, 1, 0, 0, 0) + qname + struct.pack("!HH", 16, 1)
+
+
+def _skip_name(data: bytes, offset: int) -> int:
+    for _ in range(128):
+        length = data[offset]
+        if length & 0xC0 == 0xC0:
+            return offset + 2
+        if length & 0xC0:
+            raise ValueError("bad label")
+        offset += 1 + length
+        if length == 0:
+            return offset
+    raise ValueError("name too long")
+
+
+def parse_txt_answers(data: bytes, qid: int) -> list[str]:
+    """TXT strings of a response with id ``qid``; raises ValueError if malformed or not NOERROR."""
+    if len(data) < 12:
+        raise ValueError("short reply")
+    rid, flags, qd, an, _, _ = struct.unpack("!HHHHHH", data[:12])
+    if rid != qid or not flags & 0x8000:
+        raise ValueError("not our reply")
+    if flags & 0x000F:
+        raise ValueError(f"rcode {flags & 0x000F}")
+    offset = 12
+    for _ in range(qd):
+        offset = _skip_name(data, offset) + 4
+    texts = []
+    for _ in range(an):
+        offset = _skip_name(data, offset)
+        rtype, _, _, rdlen = struct.unpack("!HHIH", data[offset:offset + 10])
+        offset += 10
+        rdata = data[offset:offset + rdlen]
+        if len(rdata) != rdlen:
+            raise ValueError("truncated rdata")
+        offset += rdlen
+        if rtype != 16:
+            continue
+        parts, i = [], 0
+        while i < len(rdata):
+            n = rdata[i]
+            parts.append(rdata[i + 1:i + 1 + n])
+            i += 1 + n
+        texts.append(b"".join(parts).decode("ascii", "replace"))
+    return texts
+
+
+def _recv_exact(sock: socket.socket, n: int) -> bytes:
+    buf = b""
+    while len(buf) < n:
+        chunk = sock.recv(n - len(buf))
+        if not chunk:
+            raise ConnectionError("short read")
+        buf += chunk
+    return buf
+
+
+def probe_once(family: str, proto: str, timeout: float | None = None, port: int | None = None) -> str:
+    """One commit-confirm probe. Returns "ok" or a reason."""
+    timeout = PROBE_TIMEOUT if timeout is None else timeout
+    port = PROBE_PORT if port is None else port
+    host = "::1" if family == "ipv6" else "127.0.0.1"
+    nonce = secrets.token_hex(16)
+    qid = secrets.randbelow(65536)
+    wire = build_probe_query(qid, nonce)
+    fam = socket.AF_INET6 if family == "ipv6" else socket.AF_INET
+    kind = socket.SOCK_DGRAM if proto == "udp" else socket.SOCK_STREAM
+    try:
+        with socket.socket(fam, kind) as sock:
+            sock.settimeout(timeout)
+            sock.connect((host, port))
+            if proto == "udp":
+                sock.send(wire)
+                data = sock.recv(4096)
+            else:
+                sock.sendall(struct.pack("!H", len(wire)) + wire)
+                (length,) = struct.unpack("!H", _recv_exact(sock, 2))
+                data = _recv_exact(sock, length)
+        texts = parse_txt_answers(data, qid)
+    except socket.timeout:
+        return "timeout"
+    except ConnectionRefusedError:
+        return "refused (not redirected)"
+    except (OSError, ValueError, struct.error, IndexError) as exc:
+        return f"error: {exc}"
+    return "ok" if f"{PROBE_PREFIX}{nonce}" in texts else "wrong answer"
+
+
+def probe(family: str) -> str:
+    """UDP and TCP probes, PROBE_TRIES each. Returns "ok" or the last failure."""
+    for proto in ("udp", "tcp"):
+        result = "not tried"
+        for attempt in range(PROBE_TRIES):
+            result = probe_once(family, proto)
+            if result == "ok":
+                break
+            if result != "timeout" and attempt + 1 < PROBE_TRIES:
+                time.sleep(0.2)
+        if result != "ok":
+            return f"{proto}: {result}"
+    return "ok"
+
+
+# --- lock and state ----------------------------------------------------------
+
+def ensure_run_dir() -> None:
+    try:
+        os.mkdir(RUN_DIR, 0o755)
+    except FileExistsError:
+        pass
+    st = os.lstat(RUN_DIR)
+    if not stat.S_ISDIR(st.st_mode) or st.st_uid not in TRUSTED_UIDS or st.st_mode & 0o022:
+        raise FwError(f"{RUN_DIR} must be a root-owned directory, not group/world-writable")
+
+
+class Lock:
+    def __init__(self, required: bool = True):
+        self.required = required
+        self.fd: int | None = None
+
+    def __enter__(self) -> "Lock":
+        ensure_run_dir()
+        fd = os.open(os.path.join(RUN_DIR, "lock"), os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+        deadline = time.monotonic() + LOCK_TIMEOUT
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                self.fd = fd
+                return self
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    if self.required:
+                        os.close(fd)
+                        raise FwError("another blockads-fw holds the lock") from None
+                    os.close(fd)
+                    log("lock timeout; continuing without it (revert must not wait forever)")
+                    return self
+                time.sleep(0.1)
+
+    def __exit__(self, *exc: object) -> None:
+        if self.fd is not None:
+            os.close(self.fd)
+            self.fd = None
+
+
+def state_path() -> str:
+    return os.path.join(RUN_DIR, "state.json")
+
+
+def read_state() -> dict | None:
+    try:
+        fd = os.open(state_path(), os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except OSError:
+        return None
+    try:
+        st = os.fstat(fd)
+        if st.st_uid not in TRUSTED_UIDS or st.st_size > 65536:
+            return None
+        data = os.read(fd, 65536)
+    finally:
+        os.close(fd)
+    try:
+        state = json.loads(data)
+    except ValueError:
+        return None
+    return state if isinstance(state, dict) else None
+
+
+def write_state(state: dict) -> None:
+    ensure_run_dir()
+    state["version"] = STATE_VERSION
+    state["updated"] = int(time.time())
+    write_file_atomic(state_path(), json.dumps(state, indent=1, sort_keys=True) + "\n", 0o644)
+
+
+def stash_emergency() -> str | None:
+    """Copy the emergency script into RUN_DIR before any rule goes in.
+
+    The units run ``/bin/sh /run/blockads-fw/emergency.sh`` on stop, so rules
+    can still be removed when the installed files were deleted under a running
+    service (a package removal that did not stop it first; found in VM testing).
+    RUN_DIR is root-owned and not writable by anyone else. Returns a warning,
+    or None; a failure never blocks the apply (the installed script still works).
+    """
+    try:
+        check_trusted(os.path.dirname(EMERGENCY_SCRIPT))
+        fd = os.open(EMERGENCY_SCRIPT, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK)
+        try:
+            st = os.fstat(fd)
+            if not stat.S_ISREG(st.st_mode) or st.st_uid not in TRUSTED_UIDS or st.st_mode & 0o022:
+                raise FwError(f"{EMERGENCY_SCRIPT} must be a root-owned regular file, not group/world-writable")
+            data = os.read(fd, MAX_EMERGENCY_BYTES + 1)
+        finally:
+            os.close(fd)
+        if len(data) > MAX_EMERGENCY_BYTES or not data.startswith(b"#!/bin/sh\n"):
+            raise FwError(f"{EMERGENCY_SCRIPT} does not look like the emergency script")
+        ensure_run_dir()
+        write_file_atomic(os.path.join(RUN_DIR, EMERGENCY_COPY), data.decode("utf-8"), 0o644)
+    except (OSError, UnicodeDecodeError, FwError) as exc:
+        return f"emergency script not copied to {RUN_DIR}: {getattr(exc, 'strerror', None) or exc}"
+    return None
+
+
+# --- apply -------------------------------------------------------------------
+
+def apply_chain(tables: Tables, table: str, builtin: str, chain: str, rules: list[list[str]]) -> str | None:
+    """Apply one chain with its jump and verify it structurally. None on success, else the reason."""
+    status, lines = tables.list_chain(table, builtin)
+    if status != "ok":
+        return f"{table} {builtin}: cannot list ({status}{': ' + lines[0] if lines else ''})"
+    text = render_transaction(table, builtin, chain, rules, exact_jumps(lines, builtin, chain))
+    rc, out, err = tables.restore(text)
+    if rc != 0:
+        return f"{table} restore failed: {(err or out).strip() or f'rc={rc}'}"
+    return verify_chain(tables, table, builtin, chain, rules)
+
+
+def verify_chain(tables: Tables, table: str, builtin: str, chain: str, rules: list[list[str]]) -> str | None:
+    for rule in rules:
+        if not tables.check(table, chain, rule):
+            return f"{table} {chain}: rule missing after apply: {' '.join(rule)}"
+    status, lines = tables.list_chain(table, chain)
+    if status != "ok":
+        return f"{table} {chain}: cannot list after apply"
+    count = sum(1 for line in lines if line.startswith(f"-A {chain} "))
+    if count != len(rules):
+        return f"{table} {chain}: {count} rules, expected {len(rules)}"
+    status, lines = tables.list_chain(table, builtin)
+    if status != "ok":
+        return f"{table} {builtin}: cannot list after apply"
+    jumps = jump_lines(lines, builtin, chain)
+    if len(jumps) != 1 or exact_jumps(lines, builtin, chain) != 1:
+        return f"{table} {builtin}: {len(jumps)} jumps to {chain}, expected exactly one"
+    return None
+
+
+def apply_hooks(tables: Tables, hooks: tuple, cfg: dict, uid: int, resolved_uid: int | None) -> str | None:
+    for table, builtin, chain in hooks:
+        error = apply_chain(tables, table, builtin, chain,
+                            render_rules(tables.family, chain, cfg, uid, resolved_uid))
+        if error:
+            return error
+    return None
+
+
+def ipv6_eligibility(cfg: dict, backend: Backend, port: int) -> tuple[bool, str, str]:
+    """(eligible, status, reason). Status: active/disabled/unavailable/degraded."""
+    if cfg["ipv6"] == "off":
+        return False, "disabled", "ipv6=off in firewall.conf"
+    addresses = ipv6_addresses()
+    if addresses is None:
+        return False, "unavailable", "IPv6 is disabled in the kernel"
+    if not addresses:
+        return False, "unavailable", "no IPv6 addresses"
+    if not any(addr == "::1" for addr, _ in addresses):
+        return False, "degraded", "::1 is missing (IPv6 disabled on lo?)"
+    if not backend.tools.get("ipv6"):
+        return False, "degraded", "ip6tables is not installed"
+    status, detail = Tables(backend, "ipv6").list_chain("nat", "OUTPUT")
+    if status != "ok":
+        return False, "degraded", f"ip6tables nat is not usable{': ' + detail[0] if detail else ''}"
+    if not has_listener("ipv6", port):
+        return False, "degraded", f"nothing listens on [::1]:{port} (UDP and TCP)"
+    return True, "active", ""
+
+
+def collect_warnings(tables: Tables) -> list[str]:
+    warnings = []
+    status, lines = tables.list_chain("nat", "OUTPUT")
+    if status != "ok":
+        return warnings
+    rules = [line for line in lines if line.startswith("-A OUTPUT ")]
+    if rules and rules[0] != f"-A OUTPUT -j {CHAIN_DNS}":
+        position = next((i + 1 for i, line in enumerate(rules) if line == f"-A OUTPUT -j {CHAIN_DNS}"), None)
+        warnings.append(f"{tables.family}: our nat OUTPUT jump is at position {position}, not first")
+    for line in rules:
+        if CHAIN_DNS in line:
+            continue
+        if re.search(r"--dports? (\S*,)?53(\D|$)", line) and re.search(r"-j (REDIRECT|DNAT)", line):
+            warnings.append(f"{tables.family}: another DNS NAT rule in nat OUTPUT: {line}")
+    return warnings
+
+
+def preflight(cfg: dict) -> tuple[Backend, int, int | None, list[str]]:
+    backend = current_backend()
+    if backend is None:
+        raise FwError("iptables / iptables-restore not found in " + ", ".join(BIN_DIRS))
+    uid = service_uid()
+    start = unprivileged_port_start()
+    if cfg["port"] >= start:
+        raise FwError(f"port {cfg['port']} is not privileged (ip_unprivileged_port_start={start}); refusing")
+    if not has_listener("ipv4", cfg["port"]):
+        raise FwError(f"nothing listens on 127.0.0.1:{cfg['port']} (UDP and TCP)")
+    notes = []
+    mode = resolved_dot_mode()
+    resolved_uid = None
+    if mode in ("yes", "unknown") and cfg["block_dot"]:
+        try:
+            resolved_uid = pwd.getpwnam(RESOLVED_USER).pw_uid
+        except KeyError:
+            resolved_uid = None
+        if resolved_uid is not None:
+            notes.append(f"systemd-resolved DNSOverTLS={mode}: its DoT is exempt from the 853 block (partial)")
+    return backend, uid, resolved_uid, notes
+
+
+def cmd_apply(args: argparse.Namespace) -> int:
+    require_root()
+    with Lock():
+        cfg, warnings = read_config()
+        backend, uid, resolved_uid, notes = preflight(cfg)
+        warnings += notes
+        stash_warning = stash_emergency()
+        if stash_warning:
+            log(stash_warning)
+            warnings.append(stash_warning)
+        state: dict = {
+            "applied": False, "backend": backend.name, "port": cfg["port"],
+            "block_dot": cfg["block_dot"], "block_webrtc": cfg["block_webrtc"],
+            "partial": resolved_uid is not None, "families": {}, "bridge": {}, "warnings": warnings,
+        }
+        # Leftovers in the other backend would intercept (or break) DNS too.
+        for other in all_backends():
+            if other.name != backend.name:
+                left = revert_backend(other, quiet=True)
+                if left:
+                    warnings.append(f"{other.name}: could not remove leftovers: {'; '.join(left)}")
+
+        v4 = Tables(backend, "ipv4")
+        error = apply_hooks(v4, MAIN_HOOKS, cfg, uid, resolved_uid)
+        if not error and args.verify:
+            result = probe("ipv4")
+            error = None if result == "ok" else f"ipv4 probe failed: {result}"
+        if error:
+            log(error)
+            left = revert_backend(backend)
+            state["error"] = error
+            state["families"]["ipv4"] = {"status": "failed", "reason": error}
+            if left:
+                state["left"] = left
+            write_state(state)
+            return 1
+        state["families"]["ipv4"] = {"status": "active"}
+        active = ["ipv4"]
+
+        eligible, status, reason = ipv6_eligibility(cfg, backend, cfg["port"])
+        if eligible:
+            v6 = Tables(backend, "ipv6")
+            error = apply_hooks(v6, MAIN_HOOKS, cfg, uid, resolved_uid)
+            if not error and args.verify:
+                result = probe("ipv6")
+                error = None if result == "ok" else f"ipv6 probe failed: {result}"
+            if error:
+                log(error)
+                revert_family(v6)
+                status, reason = "degraded", error
+            else:
+                active.append("ipv6")
+        elif backend.tools.get("ipv6") and status != "unavailable":
+            revert_family(Tables(backend, "ipv6"))
+        state["families"]["ipv6"] = {"status": status, **({"reason": reason} if reason else {})}
+
+        state["bridge"] = apply_bridge(backend, cfg, uid, active, warnings)
+        for family in active:
+            warnings.extend(collect_warnings(Tables(backend, family)))
+        state["applied"] = True
+        write_state(state)
+    for warning in warnings:
+        log(f"warning: {warning}")
+    log(f"applied ({backend.name}): ipv4 active, ipv6 {state['families']['ipv6']['status']}")
+    return 0
+
+
+def apply_bridge(backend: Backend, cfg: dict, uid: int, active: list[str], warnings: list[str]) -> dict:
+    """Opt-in bridge redirect; failures only disable it. Off → chains removed."""
+    if not cfg["bridge_interfaces"]:
+        for family in backend.families():
+            tables = Tables(backend, family)
+            for hook in BRIDGE_HOOKS:
+                revert_hook(tables, *hook)
+        return {"status": "off"}
+    families = {}
+    for family in active:
+        tables = Tables(backend, family)
+        if not has_listener(family, cfg["bridge_port"], any_address=True):
+            reason = f"nothing listens on port {cfg['bridge_port']} ({family})"
+        else:
+            reason = apply_hooks(tables, BRIDGE_HOOKS, cfg, uid, None)
+        if reason:
+            for hook in BRIDGE_HOOKS:
+                revert_hook(tables, *hook)
+            warnings.append(f"bridge redirect ({family}) inactive: {reason}")
+            families[family] = {"status": "inactive", "reason": reason}
+        else:
+            families[family] = {"status": "active"}
+    return {"status": "on", "interfaces": cfg["bridge_interfaces"], "families": families}
+
+
+# --- revert ------------------------------------------------------------------
+
+def revert_hook(tables: Tables, table: str, builtin: str, chain: str) -> list[str]:
+    """Remove every jump to ``chain`` from ``builtin``, then flush and delete it.
+
+    Never stops early. Returns what could not be removed.
+    """
+    errors = []
+    for _ in range(MAX_DELETES):
+        status, lines = tables.list_chain(table, builtin)
+        if status != "ok":
+            if status == "unknown":
+                errors.append(f"{table} {builtin}: cannot list: {lines[0] if lines else ''}")
+            break
+        jumps = jump_lines(lines, builtin, chain)
+        if not jumps:
+            break
+        progress = False
+        for line in jumps:
+            spec = shlex.split(line)[2:]
+            rc = tables.run("-t", table, "-D", builtin, *spec)[0]
+            if rc != 0:
+                rc = tables.run("-t", table, "-D", builtin, "-j", chain)[0]
+            progress = progress or rc == 0
+        if not progress:
+            break
+    tables.run("-t", table, "-F", chain)
+    tables.run("-t", table, "-X", chain)
+    status, lines = tables.list_chain(table, builtin)
+    if status == "ok" and jump_lines(lines, builtin, chain):
+        errors.append(f"{table} {builtin}: jump to {chain} still present")
+    elif status == "unknown" and not errors:
+        errors.append(f"{table} {builtin}: cannot list: {lines[0] if lines else ''}")
+    status, _ = tables.list_chain(table, chain)
+    if status == "ok":
+        errors.append(f"{table} {chain}: chain still present")
+    return [f"{tables.backend.name}/{tables.family}: {error}" for error in errors]
+
+
+def revert_family(tables: Tables) -> list[str]:
+    left = []
+    for hook in MAIN_HOOKS + BRIDGE_HOOKS + HISTORICAL_HOOKS:
+        left += revert_hook(tables, *hook)
+    return left
+
+
+def revert_backend(backend: Backend, quiet: bool = False) -> list[str]:
+    left = []
+    for family in backend.families():
+        if backend.name == "legacy" and not legacy_tables_loaded(family):
+            continue
+        tables = Tables(backend, family)
+        if family == "ipv6" and ipv6_addresses() is None:
+            status, _ = tables.list_chain("filter", "OUTPUT")
+            if status != "ok":
+                continue
+        left += revert_family(tables)
+    if left and not quiet:
+        for item in left:
+            log(f"left behind: {item}")
+    return left
+
+
+def cmd_revert(args: argparse.Namespace) -> int:
+    require_root()
+    with Lock(required=False):
+        current = current_backend()
+        if args.all_backends:
+            backends = all_backends(current)
+        else:
+            backends = [current] if current else []
+            previous = (read_state() or {}).get("backend")
+            if previous in ("nft", "legacy") and previous != (current.name if current else None):
+                backends += [b for b in all_backends(current) if b.name == previous]
+        left = []
+        for backend in backends:
+            left += revert_backend(backend)
+        try:
+            write_state({"applied": False, "reverted": True, **({"left": left} if left else {})})
+        except OSError as exc:
+            log(f"cannot write state: {exc}")
+    if not backends:
+        log("no iptables binaries found; nothing to revert")
+    if left:
+        log("revert incomplete")
+        return 1
+    return 0
+
+
+# --- status, doctor ----------------------------------------------------------
+
+def live_status(backend: Backend) -> dict:
+    result = {}
+    for family in backend.families():
+        tables = Tables(backend, family)
+        per = {}
+        for table, builtin, chain in MAIN_HOOKS + BRIDGE_HOOKS:
+            status, lines = tables.list_chain(table, builtin)
+            per[chain] = len(jump_lines(lines, builtin, chain)) if status == "ok" else status
+        result[family] = per
+    return result
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    state = read_state()
+    report: dict = {"state": state}
+    if os.geteuid() == 0:
+        backend = current_backend()
+        if backend:
+            report["live"] = {"backend": backend.name, "jumps": live_status(backend)}
+    if args.json:
+        print(json.dumps(report, indent=1, sort_keys=True))
+        return 0
+    if not state:
+        print("state: unknown (never applied since boot)")
+    else:
+        print(f"applied: {'yes' if state.get('applied') else 'no'}"
+              + (f" ({state.get('backend')})" if state.get("backend") else ""))
+        for family, info in sorted((state.get("families") or {}).items()):
+            print(f"{family}: {info.get('status')}" + (f" ({info['reason']})" if info.get("reason") else ""))
+        bridge = state.get("bridge") or {}
+        if bridge.get("status") == "on":
+            print(f"containers/VMs: {len(bridge.get('interfaces', []))} interface pattern(s)")
+        if state.get("partial"):
+            print("partial: systemd-resolved DoT is exempt")
+        for warning in state.get("warnings") or []:
+            print(f"warning: {warning}")
+        if state.get("error"):
+            print(f"error: {state['error']}")
+    if "live" in report:
+        print(f"live ({report['live']['backend']}): {json.dumps(report['live']['jumps'], sort_keys=True)}")
+    return 0
+
+
+def doctor_checks() -> list[tuple[str, str, str]]:
+    checks: list[tuple[str, str, str]] = []
+
+    def add(level: str, name: str, detail: str = "") -> None:
+        checks.append((level, name, detail))
+
+    try:
+        cfg, notes = read_config()
+        add("ok", "config", CONF_PATH)
+        for note in notes:
+            add("warn", "config", note)
+    except FwError as exc:
+        add("fail", "config", str(exc))
+        cfg = validate_config({})
+    backend = None
+    try:
+        backend = current_backend()
+        if backend:
+            add("ok", "iptables", f"{backend.name} backend: {backend.tools['ipv4'][0]}")
+            if not backend.tools.get("ipv6"):
+                add("warn", "ip6tables", "not installed")
+        else:
+            add("fail", "iptables", "iptables and iptables-restore not found")
+    except FwError as exc:
+        add("fail", "iptables", str(exc))
+    try:
+        add("ok", "service user", f"{SERVICE_USER} uid {service_uid()}")
+    except FwError as exc:
+        add("fail", "service user", str(exc))
+    start = unprivileged_port_start()
+    add("ok" if cfg["port"] < start else "fail", "port privileged",
+        f"port {cfg['port']}, ip_unprivileged_port_start={start}")
+    add("ok" if has_listener("ipv4", cfg["port"]) else "fail", "listener ipv4", f"127.0.0.1:{cfg['port']}")
+    if backend:
+        eligible, status, reason = ipv6_eligibility(cfg, backend, cfg["port"]) if os.geteuid() == 0 else \
+            (None, "unknown", "needs root")
+        add("ok" if eligible or status in ("disabled", "unavailable") else "warn", "ipv6", f"{status} {reason}".strip())
+    if cfg["bridge_interfaces"]:
+        add("ok" if has_listener("ipv4", cfg["bridge_port"], any_address=True) else "warn",
+            "bridge listener", f"port {cfg['bridge_port']} for {','.join(cfg['bridge_interfaces'])}")
+    mode = resolved_dot_mode()
+    add("warn" if mode in ("yes", "unknown") else "ok", "systemd-resolved DoT", mode)
+    if backend and os.geteuid() == 0:
+        for family, per in live_status(backend).items():
+            jumps = per.get(CHAIN_DNS)
+            add("ok" if jumps == 1 else "warn", f"jumps {family}", json.dumps(per, sort_keys=True))
+            for warning in collect_warnings(Tables(backend, family)):
+                add("warn", f"nat OUTPUT {family}", warning)
+        for other in all_backends(backend):
+            if other.name == backend.name:
+                continue
+            for family in other.families():
+                if other.name == "legacy" and not legacy_tables_loaded(family):
+                    continue
+                per = live_status(Backend(other.name, {family: other.tools[family]}))
+                if any(v for value in per.values() for v in value.values() if v not in (0, "absent")):
+                    add("warn", f"leftovers {other.name}/{family}", json.dumps(per, sort_keys=True))
+    elif os.geteuid() != 0:
+        add("info", "rules", "run as root to inspect the live rules")
+    for path in SAVED_RULESETS:
+        try:
+            with open(path, encoding="utf-8", errors="replace") as handle:
+                if "BLOCKADS_" in handle.read(4 * 1024 * 1024):
+                    add("warn", "saved ruleset", f"{path} contains BLOCKADS_ rules; remove them")
+        except OSError:
+            continue
+    state = read_state()
+    if state:
+        add("info", "state", f"applied={state.get('applied')} backend={state.get('backend')}")
+    return checks
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    checks = doctor_checks()
+    if args.json:
+        print(json.dumps([{"level": l, "check": n, "detail": d} for l, n, d in checks], indent=1))
+    else:
+        for level, name, detail in checks:
+            print(f"{level.upper():5} {name}: {detail}")
+    return 1 if any(level == "fail" for level, _, _ in checks) else 0
+
+
+# --- set-config --------------------------------------------------------------
+
+def cmd_set_config(args: argparse.Namespace) -> int:
+    require_root()
+    data = sys.stdin.buffer.read(MAX_CONF_BYTES + 1)
+    if len(data) > MAX_CONF_BYTES:
+        raise FwError("input too large", 2)
+    try:
+        change = json.loads(data)
+    except ValueError as exc:
+        raise FwError(f"invalid JSON: {exc}", 2) from None
+    if not isinstance(change, dict) or not change:
+        raise FwError("expected a non-empty JSON object", 2)
+    forbidden = set(change) - USER_KEYS
+    if forbidden:
+        raise FwError(f"not allowed: {', '.join(sorted(forbidden))} (admin-only or unknown)", 2)
+    for key in ("block_dot", "block_webrtc"):
+        if key in change and not isinstance(change[key], bool):
+            raise FwError(f"{key}: expected true or false", 2)
+    for key in ("bypass_cidrs", "bridge_interfaces"):
+        if key in change and not isinstance(change[key], list):
+            raise FwError(f"{key}: expected a list of strings", 2)
+    with Lock():
+        current, _ = read_config()
+        cfg = validate_config({**current, **change})
+        if not os.path.lexists(os.path.dirname(CONF_PATH)):
+            check_trusted(os.path.realpath(os.path.dirname(os.path.dirname(CONF_PATH))))
+            os.mkdir(os.path.dirname(CONF_PATH), 0o755)
+        directory = os.path.realpath(os.path.dirname(CONF_PATH))
+        check_trusted(directory)
+        write_file_atomic(os.path.join(directory, os.path.basename(CONF_PATH)), render_config(cfg), 0o644)
+    if bool(cfg["bridge_interfaces"]) != bool(current["bridge_interfaces"]) or "bridge_interfaces" in change:
+        log("firewall.conf updated")
+        return set_bridge_socket(bool(cfg["bridge_interfaces"]))
+    log("firewall.conf updated; run `systemctl try-restart blockadsd.service` to apply")
+    return 0
+
+
+def set_bridge_socket(enabled: bool) -> int:
+    """Enable or disable blockadsd-bridge.socket, and hand its fds to a running daemon.
+
+    systemd refuses to start a socket whose service is already active ("Socket
+    service ... already active, refusing"), and a restart does not pass new
+    fds either. So a running daemon is stopped (its stop hooks revert), the
+    socket is toggled, and the daemon is started again (it re-applies with the
+    new bridge setting).
+    """
+    systemctl = find_tool("systemctl")
+    if not systemctl:
+        log("systemctl not found; cannot toggle " + BRIDGE_SOCKET_UNIT)
+        return 1
+
+    def call(*args: str, timeout: float = 30) -> bool:
+        rc, out, err = run_cmd(systemctl, ["systemctl", *args], timeout=timeout)
+        if rc != 0:
+            log(f"systemctl {' '.join(args)} failed: {(err or out).strip()}")
+        return rc == 0
+
+    rc, _, _ = run_cmd(systemctl, ["systemctl", "is-active", "--quiet", SERVICE_UNIT], timeout=10)
+    running = rc == 0
+    verb = "enable" if enabled else "disable"
+    if not running:
+        return 0 if call(verb, "--now", BRIDGE_SOCKET_UNIT) else 1
+    ok = call("stop", SERVICE_UNIT, timeout=90)
+    ok = call(verb, "--now", BRIDGE_SOCKET_UNIT) and ok
+    # Always start again: protection must not stay off because the socket failed.
+    # An explicit admin action: it must not hit the crash-loop start limit
+    # (StartLimitBurst=6/10min) left by earlier restarts.
+    call("reset-failed", SERVICE_UNIT, timeout=10)
+    ok = call("start", SERVICE_UNIT, timeout=90) and ok
+    if ok:
+        log(f"{SERVICE_UNIT} restarted with the bridge listener {'on' if enabled else 'off'}")
+    return 0 if ok else 1
+
+
+# --- main --------------------------------------------------------------------
+
+def require_root() -> None:
+    if os.geteuid() != 0:
+        raise FwError("must run as root", 2)
+
+
+def setup_process() -> None:
+    os.umask(0o022)
+    os.environ.clear()
+    os.environ.update(CLEAN_ENV)
+    try:
+        os.chdir("/")
+    except OSError:
+        pass
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="blockads-fw", description="blockads-linux root helper")
+    sub = parser.add_subparsers(dest="command", required=True)
+    apply_p = sub.add_parser("apply", help="apply the interception rules")
+    apply_p.add_argument("--verify", action="store_true", help="commit-confirm with a DNS probe")
+    revert_p = sub.add_parser("revert", help="remove every blockads rule")
+    revert_p.add_argument("--all-backends", action="store_true", help="both nft and legacy")
+    status_p = sub.add_parser("status")
+    status_p.add_argument("--json", action="store_true")
+    doctor_p = sub.add_parser("doctor")
+    doctor_p.add_argument("--json", action="store_true")
+    sub.add_parser("set-config", help="change firewall.conf (JSON object on stdin)")
+    return parser
+
+
+COMMANDS = {
+    "apply": cmd_apply,
+    "revert": cmd_revert,
+    "status": cmd_status,
+    "doctor": cmd_doctor,
+    "set-config": cmd_set_config,
+}
+
+
+def main(argv: list[str] | None = None) -> int:
+    setup_process()
+    try:
+        args = build_parser().parse_args(argv)
+    except SystemExit as exc:
+        return 2 if exc.code else 0
+    try:
+        return COMMANDS[args.command](args)
+    except FwError as exc:
+        log(str(exc))
+        return exc.code
+    except Exception as exc:  # noqa: BLE001 - a root helper reports, never tracebacks into logs silently
+        log(f"internal error: {type(exc).__name__}: {exc}")
+        if args.command == "apply":
+            # Fail-open: never leave half-applied rules behind.
+            try:
+                backend = current_backend()
+                if backend:
+                    revert_backend(backend)
+            except Exception as inner:  # noqa: BLE001
+                log(f"revert after internal error failed: {inner}")
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,41 @@
+*nat
+:BLOCKADS_DNS - [0:0]
+-A BLOCKADS_DNS -d ::1/128 -p udp -m udp --dport 9 -m comment --comment "blockads-linux probe; runtime-only, do not persist" -j REDIRECT --to-ports 153
+-A BLOCKADS_DNS -d ::1/128 -p tcp -m tcp --dport 9 -j REDIRECT --to-ports 153
+-A BLOCKADS_DNS -m owner --uid-owner 977 -j RETURN
+-A BLOCKADS_DNS -m addrtype --dst-type LOCAL -j RETURN
+-A BLOCKADS_DNS -d fd7a:115c:a1e0::53/128 -j RETURN
+-A BLOCKADS_DNS -p udp -m udp --dport 53 -j REDIRECT --to-ports 153
+-A BLOCKADS_DNS -p tcp -m tcp --dport 53 -j REDIRECT --to-ports 153
+-I OUTPUT 1 -j BLOCKADS_DNS
+COMMIT
+*filter
+:BLOCKADS_OUT - [0:0]
+-A BLOCKADS_OUT -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN
+-A BLOCKADS_OUT -m owner --uid-owner 977 -j RETURN
+-A BLOCKADS_OUT -m owner --uid-owner 976 -j RETURN
+-A BLOCKADS_OUT -m addrtype --dst-type LOCAL -j RETURN
+-A BLOCKADS_OUT -p tcp -m tcp --dport 853 -j REJECT --reject-with tcp-reset
+-A BLOCKADS_OUT -p udp -m udp --dport 853 -j REJECT --reject-with icmp6-port-unreachable
+-A BLOCKADS_OUT -p udp -m multiport --dports 3478,5349,19302:19309 -j REJECT --reject-with icmp6-port-unreachable
+-A BLOCKADS_OUT -p tcp -m multiport --dports 3478,5349 -j REJECT --reject-with tcp-reset
+-I OUTPUT 1 -j BLOCKADS_OUT
+COMMIT
+*nat
+:BLOCKADS_BRIDGE - [0:0]
+-A BLOCKADS_BRIDGE -m addrtype --dst-type LOCAL -j RETURN
+-A BLOCKADS_BRIDGE -d fd7a:115c:a1e0::53/128 -j RETURN
+-A BLOCKADS_BRIDGE -i docker0 -p udp -m udp --dport 53 -j REDIRECT --to-ports 154
+-A BLOCKADS_BRIDGE -i docker0 -p tcp -m tcp --dport 53 -j REDIRECT --to-ports 154
+-A BLOCKADS_BRIDGE -i br-+ -p udp -m udp --dport 53 -j REDIRECT --to-ports 154
+-A BLOCKADS_BRIDGE -i br-+ -p tcp -m tcp --dport 53 -j REDIRECT --to-ports 154
+-I PREROUTING 1 -j BLOCKADS_BRIDGE
+COMMIT
+*filter
+:BLOCKADS_IN - [0:0]
+-A BLOCKADS_IN -p udp -m udp --dport 154 -m conntrack --ctstate DNAT -j RETURN
+-A BLOCKADS_IN -p tcp -m tcp --dport 154 -m conntrack --ctstate DNAT -j RETURN
+-A BLOCKADS_IN -p udp -m udp --dport 154 -j DROP
+-A BLOCKADS_IN -p tcp -m tcp --dport 154 -j REJECT --reject-with tcp-reset
+-I INPUT 1 -j BLOCKADS_IN
+COMMIT

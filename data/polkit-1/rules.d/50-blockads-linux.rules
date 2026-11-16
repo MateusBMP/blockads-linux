@@ -1,0 +1,21 @@
+// blockads-linux. Installed to /usr/share/polkit-1/rules.d/.
+polkit.addRule(function(action, subject) {
+    // Active local users may START the filter units without a password
+    // (the GUI's "turn on"). Stopping keeps systemd's own default.
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        subject.local && subject.active &&
+        action.lookup("verb") == "start") {
+        var unit = action.lookup("unit");
+        if (unit == "blockadsd.service" || unit == "blockadsd.socket" ||
+            unit == "blockadsd-ipv6.socket") {
+            return polkit.Result.YES;
+        }
+    }
+    // The daemon flushes resolved's cache after a filter change, so blocked
+    // answers do not linger downstream.
+    if (action.id == "org.freedesktop.resolve1.flush-caches" &&
+        subject.user == "blockads") {
+        return polkit.Result.YES;
+    }
+    return polkit.Result.NOT_HANDLED;
+});

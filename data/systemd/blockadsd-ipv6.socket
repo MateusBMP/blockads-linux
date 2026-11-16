@@ -1,0 +1,21 @@
+[Unit]
+Description=blockads-linux DNS socket (IPv6)
+Documentation=man:blockadsd(8)
+# The ipv6.disable=1 boot: no IPv6 at all, nothing to catch. systemd then
+# drops the [::1] lines while parsing and refuses the unit ("bad unit file
+# setting"), and since systemd 262 a stop job naming it fails as a whole. So
+# never name this unit in stop commands: it follows blockadsd.socket.
+ConditionPathExists=/proc/sys/net/ipv6
+PartOf=blockadsd.socket
+
+[Socket]
+ListenDatagram=[::1]:153
+ListenStream=[::1]:153
+BindIPv6Only=ipv6-only
+# Starts even while ::1 is missing (IPv6 disabled by sysctl); serves once it is back.
+FreeBind=yes
+FileDescriptorName=dns-v6
+Service=blockadsd.service
+
+[Install]
+WantedBy=sockets.target

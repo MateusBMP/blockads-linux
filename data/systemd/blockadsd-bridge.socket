@@ -1,0 +1,22 @@
+[Unit]
+Description=blockads-linux DNS socket for containers and VMs (opt-in)
+Documentation=man:blockadsd(8)
+# Shipped disabled. `blockads-fw set-config` enables it together with
+# `bridge_interfaces=`. Only redirected (ctstate DNAT) packets reach it, and the
+# daemon answers only sources inside the configured bridges.
+# Stopping blockadsd.socket stops this one too.
+PartOf=blockadsd.socket
+
+[Socket]
+# Must match `bridge_port=` in /etc/blockads-linux/firewall.conf.
+ListenDatagram=0.0.0.0:154
+ListenStream=0.0.0.0:154
+ListenDatagram=[::]:154
+ListenStream=[::]:154
+BindIPv6Only=ipv6-only
+FreeBind=yes
+FileDescriptorName=dns-bridge
+Service=blockadsd.service
+
+[Install]
+WantedBy=sockets.target

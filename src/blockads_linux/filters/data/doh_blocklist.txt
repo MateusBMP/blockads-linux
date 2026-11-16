@@ -1,0 +1,37 @@
+# Known DNS-over-HTTPS resolver hostnames, blocked when
+# "Block DNS-over-HTTPS bypass" is enabled (domain and subdomains).
+# Generated from blockads-android app/src/main/assets/blocklist_doh.txt @ fc95d66a9443da14729e280c61b496a2bcdda86c (GPL-3.0).
+cloudflare-dns.com
+mozilla.cloudflare-dns.com
+one.one.one.one
+security.cloudflare-dns.com
+family.cloudflare-dns.com
+dns.google
+dns.google.com
+dns64.dns.google
+dns.quad9.net
+dns9.quad9.net
+dns10.quad9.net
+dns11.quad9.net
+dns.adguard-dns.com
+unfiltered.adguard-dns.com
+family.adguard-dns.com
+dns.nextdns.io
+doh.opendns.com
+doh.familyshield.opendns.com
+doh.cleanbrowsing.org
+doh.mullvad.net
+adblock.doh.mullvad.net
+dns.controld.com
+freedns.controld.com
+dns.alidns.com
+doh.pub
+dot.pub
+dns.sb
+doh.dns.sb
+doh.shield.comodo.com
+doh.alternate-dns.com
+private.canadianshield.cira.ca
+protected.canadianshield.cira.ca
+family.canadianshield.cira.ca
+doh.libredns.gr

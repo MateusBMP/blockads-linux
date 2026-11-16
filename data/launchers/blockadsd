@@ -1,0 +1,14 @@
+#!/usr/bin/python3 -I
+# blockadsd: the DNS filter daemon (blockadsd.service).
+#
+# Installed as /usr/lib/blockads-linux/blockadsd. -I (isolated
+# mode) ignores PYTHON* variables, the user site directory and the script's
+# directory; our code comes only from the private directory below, which is
+# root-owned like the rest of /usr.
+import sys
+
+sys.path.insert(0, "/usr/lib/blockads-linux/python")
+
+from blockads_linux.daemon.__main__ import main  # noqa: E402
+
+sys.exit(main())

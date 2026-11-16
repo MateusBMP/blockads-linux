@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "blockads-linux"
+description = "System-wide DNS filtering for Linux (ads, trackers, malware) with iptables interception and a Qt6 GUI; a port of blockads-android."
+readme = "README.md"
+license = "GPL-3.0-only"
+license-files = ["LICENSE", "NOTICE"]
+requires-python = ">=3.11"
+dynamic = ["version"]
+dependencies = [
+    "dnspython>=2.3",
+    "httpx>=0.23",
+    "h2>=4",
+    "jeepney>=0.8",
+]
+
+[project.optional-dependencies]
+gui = ["PyQt6>=6.4"]
+quic = ["aioquic>=0.9"]
+dev = ["pytest>=7"]
+
+# Development entry points only. System packages install private launchers
+# under /usr/lib/blockads-linux instead.
+[project.scripts]
+blockadsctl = "blockads_linux.ctl.cli:main"
+
+[project.gui-scripts]
+blockads = "blockads_linux.gui.app:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "blockads_linux.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"blockads_linux.filters" = ["data/*.json", "data/*.txt"]
+"blockads_linux.gui" = ["i18n/*.qm"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"
