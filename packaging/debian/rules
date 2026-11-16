@@ -21,5 +21,9 @@ override_dh_auto_install:
 override_dh_python3:
 	dh_python3 /usr/lib/blockads-linux/python
 
+# --no-stop-on-upgrade: without it, --no-start makes debhelper's preinst stop every
+# unit on an upgrade (sockets, timer and path included) and nothing starts them
+# again; postinst's try-restart then finds the daemon stopped. Protection would be
+# off after every upgrade. With it, postinst restarts a running daemon on the new code.
 override_dh_installsystemd:
-	dh_installsystemd --no-enable --no-start
+	dh_installsystemd --no-enable --no-start --no-stop-on-upgrade

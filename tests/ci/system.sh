@@ -23,7 +23,7 @@ mkdir -p "$(dirname "$log")"
     # platform_checks.sh expects the tree at /opt/blockads, readable by every user.
     rm -rf /opt/blockads && mkdir -p /opt/blockads
     tar -C "$ROOT" --exclude=.git --exclude='__pycache__' --exclude=results --exclude=.vm \
-        -cf - src tests tools helper data pyproject.toml LICENSE NOTICE | tar -C /opt/blockads -xf -
+        -cf - src tests tools helper data packaging Makefile pyproject.toml LICENSE NOTICE | tar -C /opt/blockads -xf -
     chmod -R a+rX /opt/blockads
     bash /opt/blockads/tests/vm/provision.sh || echo "FAIL provision"
     bash /opt/blockads/tests/vm/platform_checks.sh $sections

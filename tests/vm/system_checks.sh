@@ -39,6 +39,14 @@
 #   stop       stop leaves no BLOCKADS_ and DNS works
 #   uninstall  install.sh uninstall while running; then files deleted while
 #              running (a package manager that does not stop the service)
+# The real packages (tests/vm/run_package.sh; instead of install/uninstall):
+#   pkgbuild   build deps; an "old" (this tree) and a "new" (version + 1) package:
+#              .deb on Debian/Ubuntu, pacman on Arch, `make install` elsewhere
+#   pkginstall install old: user, tmpfiles, nothing enabled, verify, security <= 2.0
+#   pkgboot    after a reboot: the enabled units come up and apply
+#   pkgupgrade / pkgdowngrade   under the running daemon: restarted on the new
+#              code, applied once, settings and the admin's firewall.conf kept
+#   pkgremove  remove while running: no rules, DNS works, no files; Debian: purge
 #
 # Every line is PASS/FAIL/INFO/SKIP; exit status = number of FAILs (max 125).
 set -u
@@ -1058,6 +1066,194 @@ sec_gui() {
     gui_run start
     wait_for 20 applied >/dev/null
     ok "gui: after the GUI's start the redirect is applied" "" applied
+}
+
+# --- the real packages (M8) ---------------------------------------------------
+# Two builds of this tree: "old" (its version) and "new" (the last number + 1),
+# so that upgrade and downgrade change something visible (the daemon's version).
+# deb on Debian/Ubuntu, the Arch package on Arch; elsewhere `make install`
+# (packaging/manifest.sh) stands in for a package.
+PKGDIR=/var/tmp/blockads-pkg
+case $ID in debian|ubuntu) PKG_KIND=deb ;; arch) PKG_KIND=arch ;; *) PKG_KIND=make ;; esac
+bump() { [[ $1 =~ ^(.*[^0-9])([0-9]+)$ ]] && echo "${BASH_REMATCH[1]}$((BASH_REMATCH[2] + 1))"; }
+tree_version() { sed -n 's/^__version__ = "\(.*\)"/\1/p' "$1/src/blockads_linux/__init__.py"; }
+
+pkg_build_one() {  # pkg_build_one old|new : $PKGDIR/<which>.{deb,pkg.tar.zst} or the tree for make
+    local which=$1 tree=$PKGDIR/build-$1/blockads-linux
+    rm -rf "$PKGDIR/build-$which"; mkdir -p "$PKGDIR/build-$which"
+    cp -a "$SRC" "$tree"
+    find "$tree" -name __pycache__ -prune -exec rm -rf {} +
+    if [[ $which == new ]]; then
+        local pv dv; pv=$(bump "$(tree_version "$tree")")
+        dv=$(bump "$(sed -n '1s/^[^(]*(\([^)]*\)).*/\1/p' "$tree/packaging/debian/changelog")")
+        sed -i "s/^__version__ = .*/__version__ = \"$pv\"/" "$tree/src/blockads_linux/__init__.py"
+        sed -i "s/^pkgver=.*/pkgver=$pv/" "$tree/packaging/arch/PKGBUILD"
+        { printf 'blockads-linux (%s) UNRELEASED; urgency=medium\n\n  * VM upgrade test build.\n\n -- MateusBMP <bmp.mateus@gmail.com>  %s\n\n' \
+              "$dv" "$(date -R)"; cat "$tree/packaging/debian/changelog"; } >"$tree/changelog.new"
+        mv "$tree/changelog.new" "$tree/packaging/debian/changelog"
+    fi
+    local out rc
+    case $PKG_KIND in
+    deb)
+        cp -a "$tree/packaging/debian" "$tree/debian"
+        out=$(cd "$tree" && dpkg-buildpackage -us -uc -b 2>&1); rc=$?
+        cp "$PKGDIR/build-$which"/blockads-linux_*_all.deb "$PKGDIR/$which.deb" 2>/dev/null ;;
+    arch)
+        chown -R builder: "$PKGDIR/build-$which"
+        out=$(cd "$tree" && su builder -c 'make arch-pkg MAKEPKG_FLAGS="--noconfirm --nodeps"' 2>&1); rc=$?
+        cp "$tree"/packaging/arch/blockads-linux-*.pkg.tar.* "$PKGDIR/$which.pkg.tar.zst" 2>/dev/null ;;
+    make)
+        out=$(make -C "$tree" build 2>&1); rc=$? ;;
+    esac
+    echo "$out" >"$PKGDIR/build-$which.log"
+    ok "build the $which package ($PKG_KIND, $(tree_version "$tree"))" "$(tail -1 <<<"$out")" test $rc -eq 0
+}
+
+sec_pkgbuild() {
+    mkdir -p "$PKGDIR"
+    local out rc
+    case $PKG_KIND in
+    deb)
+        export DEBIAN_FRONTEND=noninteractive
+        mkdir -p "$PKGDIR/bd"; rm -rf "$PKGDIR/bd/debian"
+        cp -a "$SRC/packaging/debian" "$PKGDIR/bd/debian"
+        out=$(apt-get install -y -qq --no-install-recommends build-essential dpkg-dev 2>&1 &&
+              apt-get build-dep -y -qq "$PKGDIR/bd" 2>&1); rc=$? ;;
+    arch)
+        out=$(pacman -S --noconfirm --needed --noprogressbar base-devel qt6-tools make 2>&1); rc=$?
+        id builder >/dev/null 2>&1 || useradd -m builder ;;
+    make)
+        out=$(dnf install -y -q make qt6-linguist 2>&1 || dnf install -y -q make 2>&1); rc=$? ;;
+    esac
+    ok "build dependencies installed" "$(tail -1 <<<"$out")" test $rc -eq 0
+    pkg_build_one old
+    pkg_build_one new
+}
+
+pkg_installed_version() {
+    case $PKG_KIND in
+    deb) dpkg-query -W -f='${Version}' blockads-linux 2>/dev/null ;;
+    arch) pacman -Q blockads-linux 2>/dev/null | awk '{print $2}' ;;
+    make) [[ -f /var/lib/blockads-linux-install.manifest ]] && blockadsctl --version 2>/dev/null | awk 'NR==1{print $NF}' ;;
+    esac
+}
+pkg_files() {  # the installed package's own files and links (not directories)
+    case $PKG_KIND in
+    deb) dpkg -L blockads-linux 2>/dev/null | while read -r f; do [[ ( -f $f || -L $f ) && ! -d $f ]] && echo "$f"; done ;;
+    arch) pacman -Qlq blockads-linux 2>/dev/null | grep -v '/$' ;;
+    make) grep -v '/$' /var/lib/blockads-linux-install.manifest 2>/dev/null ;;
+    esac
+}
+pkg_put() {  # pkg_put old|new : install, upgrade or downgrade to that build
+    local which=$1
+    case $PKG_KIND in
+    deb) DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --allow-downgrades "$PKGDIR/$which.deb" 2>&1 ;;
+    arch) pacman -U --noconfirm --noprogressbar "$PKGDIR/$which.pkg.tar.zst" 2>&1 ;;
+    make) make -C "$PKGDIR/build-$which/blockads-linux" install 2>&1 ;;
+    esac
+}
+one_jump() { applied && [[ $(jumps) -eq 1 ]]; }
+daemon_version_is() { [ "$(ctl_json 'd["version"]')" = "$1" ]; }
+# "→ Overall exposure level for blockadsd.service: 1.2 OK 🙂"
+security_score() { systemd-analyze security blockadsd.service 2>/dev/null | sed -n 's/.*Overall exposure level for [^:]*: \([0-9.]*\).*/\1/p'; }
+
+sec_pkginstall() {
+    # The package must create the daemon user itself (provision.sh made one).
+    pgrep -u blockads >/dev/null 2>&1 || userdel blockads 2>/dev/null
+    local out rc; out=$(pkg_put old); rc=$?
+    ok "install the old package" "$(tail -1 <<<"$out")" test $rc -eq 0
+    pkg_files >"$PKGDIR/files-installed"
+    info "installed" "$(pkg_installed_version), $(wc -l <"$PKGDIR/files-installed") files"
+    ok "the package created the blockads user" "$(id blockads 2>&1)" id blockads
+    ok "tmpfiles: /etc/blockads-linux, /run/blockads-fw" "" test -d /etc/blockads-linux -a -d /run/blockads-fw
+    local frag; frag="$(readlink -f "$(systemctl show -p FragmentPath --value blockadsd.service)")"
+    ok "systemd loads the packaged blockadsd.service" "$frag" grep -qx "$frag" <(xargs -r readlink -f <"$PKGDIR/files-installed")
+    ok "nothing enabled or started" "$(systemctl is-enabled blockadsd.socket 2>&1) $(systemctl is-active blockadsd.service)" \
+        bash -c '[ "$(systemctl is-active blockadsd.service blockadsd.socket | sort -u)" = inactive ] && ! ls /etc/systemd/system/*/blockads* >/dev/null 2>&1'
+    local units; units=$(grep -E '/systemd/system/blockads(d|-update|-failsafe)\.service$' "$PKGDIR/files-installed" | tr '\n' ' ')
+    out=$(systemd-analyze verify --man=no $units 2>&1)
+    local ours; ours=$(grep -i blockads <<<"$out" | head -3)
+    ok "systemd-analyze verify (packaged units)" "${ours:-clean}" test -z "$ours"
+    local score; score=$(security_score)
+    ok "systemd-analyze security blockadsd.service <= 2.0" "${score:-?}" \
+        python3 -I -c 'import sys; sys.exit(0 if float(sys.argv[1]) <= 2.0 else 1)' "${score:-99}"
+    if command -v selinuxenabled >/dev/null && selinuxenabled; then
+        local labels; labels=$(ls -Z $LIB/blockadsd $LIB/blockads-update $LIB/blockads-fw $LIB/blockads-fw-emergency.sh 2>&1)
+        ok "SELinux: the executables are bin_t" "$(awk '{print $1}' <<<"$labels" | sort -u | tr '\n' ' ')" \
+            bash -c '! grep -v ":bin_t:" <<<"$1" | grep -q .' _ "$labels"
+    fi
+}
+
+sec_pkgboot() {  # after a reboot: the enabled units come up and protect without help
+    local t; t=$(wait_for 60 applied)
+    ok "after boot: the daemon is up and the firewall applied" "${t}s" applied
+    local r; r=$(q $NOWHERE example.com)
+    ok "after boot: redirect answers" "$r" [ "${r%% *}" = NOERROR ]
+}
+
+pkg_switch() {  # pkg_switch upgrade|downgrade old|new : under a running, applied daemon
+    local what=$1 which=$2 want; want=$(tree_version "$PKGDIR/build-$which/blockads-linux")
+    is_active && applied || restart_daemon
+    blockadsctl block pkg-bt.example.com >/dev/null 2>&1
+    grep -q '^# admin edit' /etc/blockads-linux/firewall.conf || echo '# admin edit' >>/etc/blockads-linux/firewall.conf
+    local pid; pid=$(main_pid)
+    cp "$PKGDIR/files-installed" "$PKGDIR/files-before"
+    local out rc; out=$(pkg_put "$which"); rc=$?
+    ok "$what to the $which package" "$(tail -1 <<<"$out")" test $rc -eq 0
+    [[ $rc -eq 0 ]] || echo "$out" | tail -5 | while IFS= read -r l; do info "$what" "$l"; done
+    info "$what: installed version" "$(pkg_installed_version)"
+    local t; t=$(wait_for 30 bash -c "[ \"\$(systemctl show -p MainPID --value blockadsd.service)\" != $pid ] && [ \"\$(systemctl is-active blockadsd.service)\" = active ]")
+    ok "$what: the running daemon was restarted" "${t}s (pid $pid -> $(main_pid))" waited "$t"
+    t=$(wait_for 30 daemon_version_is "$want")
+    ok "$what: the daemon runs the $which code ($want)" "$(ctl_json 'd["version"]') after ${t}s" waited "$t"
+    t=$(wait_for 30 applied); ok "$what: firewall applied, once" "${t}s, $(jumps) jump(s)" one_jump
+    t=$(wait_for 5 resolves_example); ok "$what: DNS resolves" "${t}s" waited "$t"
+    local r; r=$(q $NOWHERE pkg-bt.example.com)
+    ok "$what: settings kept (a blocked domain)" "$r" [ "$r" = "NOERROR 0.0.0.0" ]
+    ok "$what: the admin's firewall.conf kept" "" grep -q '^# admin edit' /etc/blockads-linux/firewall.conf
+    ok "$what: units still enabled" "$(systemctl is-enabled blockadsd.socket blockadsd.service | tr '\n' ' ')" \
+        bash -c '[ "$(systemctl is-enabled blockadsd.socket blockadsd.service | sort -u)" = enabled ]'
+    pkg_files >"$PKGDIR/files-installed"
+    # Files only the previous version had (none today, but a rename must not leave one behind).
+    local gone; gone=$(comm -23 <(sort "$PKGDIR/files-before") <(sort "$PKGDIR/files-installed") |
+        while IFS= read -r f; do [[ $f != /etc/* && ( -e $f || -L $f ) ]] && echo "$f"; done)
+    ok "$what: no files only the previous version had" "${gone:-none}" test -z "$gone"
+}
+sec_pkgupgrade() { pkg_switch upgrade new; }
+sec_pkgdowngrade() { pkg_switch downgrade old; }
+
+sec_pkgremove() {
+    is_active && applied || restart_daemon
+    pkg_files >"$PKGDIR/files-installed"
+    local out rc
+    case $PKG_KIND in
+    deb) out=$(DEBIAN_FRONTEND=noninteractive apt-get remove -y -qq blockads-linux 2>&1) ;;
+    arch) out=$(pacman -R --noconfirm --noprogressbar blockads-linux 2>&1) ;;
+    make) out=$(make -C "$PKGDIR/build-old/blockads-linux" uninstall 2>&1) ;;
+    esac
+    rc=$?
+    ok "remove the package while the daemon runs" "$(tail -1 <<<"$out")" test $rc -eq 0
+    ok "remove: no BLOCKADS_ left" "$(fw_left) lines" reverted
+    local t; t=$(wait_for 5 resolves_example); ok "remove: DNS resolves within 5s" "${t}s" waited "$t"
+    ok "remove: the daemon is not running" "$(systemctl is-active blockadsd.service)" bash -c '! pgrep -u blockads >/dev/null'
+    ok "remove: nothing owns io.github.mateusbmp.BlockAds1" "" bash -c '! busctl --system status io.github.mateusbmp.BlockAds1 >/dev/null 2>&1'
+    # Configuration files stay on a remove (dpkg conffiles, pacman .pacsave of a changed file).
+    local left; left=$(while IFS= read -r f; do [[ -n $f && $f != /etc/* && ( -e $f || -L $f ) ]] && echo "$f"; done <"$PKGDIR/files-installed")
+    ok "remove: none of the package's files left (outside /etc)" "${left:-none}" test -z "$left"
+    ok "remove: no $LIB, no /run/blockads-fw" "" test ! -e $LIB -a ! -e /run/blockads-fw
+    ok "remove: no enabled-unit links left" "$(ls /etc/systemd/system/*/blockads* 2>/dev/null | tr '\n' ' ')" \
+        bash -c '! ls /etc/systemd/system/*/blockads* >/dev/null 2>&1'
+    ok "remove: settings kept in /var/lib/blockads-linux" "" test -d /var/lib/blockads-linux
+    info "remove: /etc/blockads-linux" "$(ls -A /etc/blockads-linux 2>/dev/null | tr '\n' ' ')"
+    if [[ $PKG_KIND == deb ]]; then
+        out=$(DEBIAN_FRONTEND=noninteractive apt-get purge -y -qq blockads-linux 2>&1); rc=$?
+        ok "purge" "$(tail -1 <<<"$out")" test $rc -eq 0
+        ok "purge: no /var/lib/blockads-linux, no /etc/blockads-linux" "" test ! -e /var/lib/blockads-linux -a ! -e /etc/blockads-linux
+        ok "purge: dpkg has no record" "$(dpkg -l blockads-linux 2>&1 | tail -1)" bash -c '! dpkg -l blockads-linux 2>/dev/null | grep -q "^[a-z][a-z]"'
+    fi
+    systemctl daemon-reload
+    ok "remove: systemd knows no blockads units" "$(systemctl list-unit-files 'blockads*' --no-legend | awk '{print $1}' | tr '\n' ' ')" \
+        bash -c '[ -z "$(systemctl list-unit-files "blockads*" --no-legend)" ]'
 }
 
 for s in "$@"; do

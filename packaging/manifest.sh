@@ -40,8 +40,11 @@ packaged() {
     { command -v rpm >/dev/null && rpm -qf "$1" >/dev/null 2>&1; }
 }
 
-selinux_label() {
+selinux_label() {  # selinux_label MANIFEST
     command -v selinuxenabled >/dev/null && selinuxenabled || return 0
+    # Every installed path gets the label the policy gives it (usr_t, bin_t,
+    # systemd_unit_file_t, ...), whatever the copy left.
+    grep -v '/$' "$1" | xargs -r -d '\n' restorecon -F
     # A lib_t executable started by systemd stays in init_t, which may not open TCP to 443
     # (DoH), 153 or 9 (probe); bin_t gives unconfined_service_t, as for any third-party service.
     local spec="$LIB/(blockadsd|blockads-update|blockads-fw|blockads-fw-emergency\\.sh)"
@@ -145,7 +148,9 @@ cmd_install() {
             created_files+=("$p")
         fi
         # Write next to the target, then rename: a running service never sees half a file.
-        cp -a "$stage$p" "$p.$NAME-tmp"
+        # Not cp -a: that keeps the staging directory's SELinux label (user_tmp_t),
+        # and D-Bus then refuses to read the bus policy (selinux_label relabels too).
+        cp -P --preserve=mode,timestamps "$stage$p" "$p.$NAME-tmp"
         chown -h root:root "$p.$NAME-tmp"
         mv -f "$p.$NAME-tmp" "$p"
         echo "$p" >>"$new_manifest"
@@ -154,7 +159,7 @@ cmd_install() {
     echo "$LIB/" >>"$new_manifest"
 
     # 3. System steps; a failure here rolls the files back as well.
-    selinux_label
+    selinux_label "$new_manifest"
     local conf
     conf=$(grep -m1 "/sysusers.d/$NAME.conf\$" "$new_manifest")
     systemd-sysusers "$conf"

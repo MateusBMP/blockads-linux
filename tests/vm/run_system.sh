@@ -6,12 +6,14 @@
 #        SECTIONS="install start" tests/vm/run_system.sh arch
 #        KEEP=1 tests/vm/run_system.sh ...           leave the VMs running afterwards
 #        REUSE=1 tests/vm/run_system.sh ...          use a kept VM: skip boot and provisioning
-# Logs: ${BLOCKADS_VM_DIR:-~/.cache/blockads-vm}/results/<image>-system.log
+#        TAG=package SECTIONS=... ...               another suite: VM <image>-<TAG>, log <image>-<TAG>.log
+# Logs: ${BLOCKADS_VM_DIR:-~/.cache/blockads-vm}/results/<image>-${TAG:-system}.log
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 VM="$HERE/vm.sh"
 RES=${BLOCKADS_VM_DIR:-$HOME/.cache/blockads-vm}/results
+TAG=${TAG:-system}
 # "reboot" is done here: system_checks.sh runs the sections before it, then the VM
 # reboots, then the rest runs (put prereboot before it and afterboot after it).
 SECTIONS=${SECTIONS:-install start api polkit faults coexist porttaken bridge libvirt zones resolveddot clock suspend captive wireguard networks prereboot reboot afterboot noipv6set reboot noipv6 gui stop uninstall}
@@ -19,12 +21,12 @@ mkdir -p "$RES"
 images=("$@"); [[ ${#images[@]} -eq 0 ]] && images=(arch debian12)
 
 run_one() {
-    local img=$1 name=$1-system log=$RES/$1-system.log
+    local img=$1 name=$1-$TAG log=$RES/$1-$TAG.log
     {
         local fresh=1
         if [[ ${REUSE:-} ]] && "$VM" ssh "$name" 'pkill -f "[m]5_checks.sh"; true' 2>/dev/null; then fresh=""
         else "$VM" up "$img" "$name" || return 1; fi
-        tar -C "$ROOT" --exclude=.git --exclude='__pycache__' --exclude='*.part' -cf - src tests tools helper data pyproject.toml LICENSE NOTICE \
+        tar -C "$ROOT" --exclude=.git --exclude='__pycache__' --exclude='*.part' -cf - src tests tools helper data packaging Makefile pyproject.toml LICENSE NOTICE \
             | "$VM" ssh "$name" 'rm -rf /opt/blockads && mkdir -p /opt/blockads && tar -C /opt/blockads -xf - && chmod -R a+rX /opt/blockads'
         [[ -z $fresh ]] || "$VM" ssh "$name" 'bash /opt/blockads/tests/vm/provision.sh' || echo "FAIL provision"
         local total=0 i rc
@@ -46,6 +48,7 @@ run_one() {
 for img in "${images[@]}"; do run_one "$img" & done
 wait
 for img in "${images[@]}"; do
-    echo "== $img: $(grep -c '^PASS' "$RES/$img-system.log") pass, $(grep -c '^FAIL' "$RES/$img-system.log") fail," \
-         "$(grep -a '^exit=' "$RES/$img-system.log" | tail -1 || true) ($RES/$img-system.log)"
+    log=$RES/$img-$TAG.log
+    echo "== $img: $(grep -c '^PASS' "$log") pass, $(grep -c '^FAIL' "$log") fail," \
+         "$(grep -a '^exit=' "$log" | tail -1 || true) ($log)"
 done
