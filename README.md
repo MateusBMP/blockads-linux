@@ -19,12 +19,14 @@ that uses the same filter catalog and rule syntax, adapted to Linux:
   (Quad9 over DoH by default) and the original publishers of the filter lists
   you enabled.
 
-> **Status:** pre-alpha. The filter engine, the DNS resolver and its upstream
-> policy, list updates, the query log and statistics, the root firewall helper,
-> system integration (systemd units, D-Bus API, polkit), the desktop GUI with
-> its tray icon and notifications, trusted networks and the Android settings
-> import all work. Packages are built from the source tree (Arch, Debian,
-> Ubuntu); there are no published releases or repositories yet.
+> **Status:** released. The port is feature-complete: the filter engine, the
+> DNS resolver and its upstream policy, list updates, the query log and
+> statistics, the root firewall helper, system integration (systemd units,
+> D-Bus API, polkit), the desktop GUI with its tray icon and notifications,
+> trusted networks and the Android settings import all work, and every
+> supported distribution is tested in CI. Packages for Debian, Ubuntu and Arch
+> are attached to each [release](https://github.com/MateusBMP/blockads-linux/releases);
+> there is no package repository yet.
 
 ## Components
 
@@ -79,6 +81,17 @@ protection on (and keep it on after a reboot) with:
 ```sh
 sudo systemctl enable --now blockadsd.service blockads-update.timer blockads-update.path
 ```
+
+**From a release.** Download the package for your distribution from the
+[latest release](https://github.com/MateusBMP/blockads-linux/releases/latest)
+and check it with `sha256sum -c SHA256SUMS --ignore-missing`:
+
+```sh
+sudo apt install ./blockads-linux_*_all.deb               # Debian 12/13, Ubuntu 24.04/26.04
+sudo pacman -U blockads-linux-*-any.pkg.tar.zst           # Arch Linux / Manjaro
+```
+
+To build the package from the source tree instead:
 
 **Arch Linux / Manjaro**
 

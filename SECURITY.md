@@ -5,8 +5,8 @@ changes the firewall. Security reports are welcome and taken seriously.
 
 ## Supported versions
 
-The project is pre-alpha and has no releases yet. Only the latest commit on
-`main` is supported; fixes are not backported.
+Only the latest release and the latest commit on `main` are supported; fixes
+are not backported to older releases.
 
 ## Reporting a vulnerability
 
