@@ -10,7 +10,7 @@
 # post-install message (blockads-linux.install).
 
 pkgname=blockads-linux
-pkgver=0.1.0
+pkgver=0.1.1.dev0
 pkgrel=1
 pkgdesc="System-wide DNS blocking of ads, trackers, malware and phishing (iptables redirect, Qt6 GUI); a port of blockads-android"
 arch=('any')

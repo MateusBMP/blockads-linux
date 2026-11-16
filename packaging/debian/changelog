@@ -1,3 +1,9 @@
+blockads-linux (0.1.1~dev0) UNRELEASED; urgency=medium
+
+  * Development version.
+
+ -- MateusBMP <bmp.mateus@gmail.com>  Mon, 16 Nov 2026 16:50:10 +0000
+
 blockads-linux (0.1.0) unstable; urgency=medium
 
   * First release: system-wide DNS blocking of ads, trackers, malware and
