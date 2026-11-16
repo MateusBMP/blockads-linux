@@ -130,7 +130,7 @@ def test_full_chain_over_doh(tmp_path):
         ))
         for reply, event in results:
             assert [r.address for r in dns.message.from_wire(render(reply)).answer[0]] == ["192.0.2.1"]
-            assert event.upstream.startswith("https://dns.test") and event.verdict is Verdict.FORWARDED
+            assert event.upstream.startswith(f"https://dns.test:{doh.port}/") and event.verdict is Verdict.FORWARDED
         assert doh.connections == 1 and len(doh.requests) == 25  # one HTTP/2 connection, 25 streams
         await forwarder.close()
         doh.close()

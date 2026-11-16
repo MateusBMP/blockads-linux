@@ -659,7 +659,8 @@ def test_android_backup_import(stack, monkeypatch):
     page.restore()
     wait_until(lambda: any("Imported from BlockAds for Android" in t for t, _e in seen), what="android import")
     rules = json.loads(daemon.paths.rules.read_text())
-    assert "||tracker.example.org^" in rules["rules"] and "cdn.example.net" in rules["whitelist"]
+    assert "||tracker.example.org^" in rules["rules"]
+    assert any(domain == "cdn.example.net" for domain in rules["whitelist"])  # an entry, not a substring
     settings = json.loads(daemon.paths.settings.read_text())
     assert settings["dns"]["upstream"] == ["cloudflare_family"] and settings["dns"]["safesearch"] is True
     assert gui.prefs.get("theme") == "black" and gui.prefs.get("notify_daily_summary") is True

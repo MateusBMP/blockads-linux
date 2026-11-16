@@ -46,6 +46,7 @@ def main() -> int:
 
     try:
         ctx = ssl.create_default_context()
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2  # the default on 3.10+; explicit for older OpenSSL configs
         with socket.create_connection(("9.9.9.9", 853), timeout=5) as raw:
             with ctx.wrap_socket(raw, server_hostname="dns.quad9.net") as tls:
                 out("tls-dot", True, f"{tls.version()} {ssl.OPENSSL_VERSION}")
