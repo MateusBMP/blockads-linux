@@ -31,16 +31,6 @@ arch)
 *) echo "unsupported distro $ID" >&2; exit 1 ;;
 esac
 
-# Rootless-style harness used by interception.sh: give root a subordinate range,
-# first in the file: util-linux 2.39's --map-auto (Ubuntu 24.04) takes the first
-# range, which on a GitHub runner is the runner user's (as in tests/ci/container.sh).
-# An existing root entry further down is moved to the top.
-for f in /etc/subuid /etc/subgid; do
-    head -1 "$f" 2>/dev/null | grep -q '^root:' && continue
-    root=$(grep -m1 '^root:' "$f" 2>/dev/null || echo 'root:200000:65536')
-    { echo "$root"; grep -v '^root:' "$f" 2>/dev/null; } >"$f.new" && mv "$f.new" "$f"
-done
-
 # Legacy xtables modules cannot be auto-loaded from inside a user namespace.
 for m in ip_tables iptable_nat iptable_filter ip6_tables ip6table_nat ip6table_filter; do
     modprobe "$m" 2>/dev/null || true
@@ -51,4 +41,16 @@ id blockads >/dev/null 2>&1 || useradd --system --no-create-home --home-dir /non
     --shell /usr/sbin/nologin blockads
 # An ordinary desktop-like user for the polkit / NM checks.
 id alice >/dev/null 2>&1 || useradd --create-home alice
+
+# Rootless-style harness used by interception.sh: root needs a subordinate range,
+# FIRST in the file: --map-auto takes the first range listed (seen with util-linux
+# 2.38 and 2.39), and on a GitHub runner that is the ubuntu or runner user's.
+# Last step, because useradd rewrites these files (and may reorder them). The
+# range sits far above what useradd hands out, so it overlaps no user's.
+for f in /etc/subuid /etc/subgid; do
+    head -1 "$f" 2>/dev/null | grep -q '^root:' && continue
+    root=$(grep -m1 '^root:' "$f" 2>/dev/null || echo 'root:100000000:65536')
+    { echo "$root"; grep -v '^root:' "$f" 2>/dev/null || true; } >"$f.new"
+    mv "$f.new" "$f"
+done
 echo provisioned
